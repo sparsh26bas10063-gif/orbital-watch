@@ -28,18 +28,30 @@ for name, params in CATALOG_QUERIES.items():
     except requests.RequestException as exc:
         print(f"no previous copy for {name}: {exc}")
 
-    resp = requests.get(CELESTRAK_URL, params={**params, "FORMAT": "tle"},
-                        headers={"User-Agent": USER_AGENT}, timeout=120)
-    if resp.ok and "\n1 " in resp.text:
-        (cur / f"{name}.txt").write_text(resp.text)
-        print(f"{name}: {resp.text.count(chr(10)) // 3} objects")
+    text = None
+    for attempt in range(1, 4):
+        try:
+            resp = requests.get(CELESTRAK_URL, params={**params, "FORMAT": "tle"},
+                                headers={"User-Agent": USER_AGENT}, timeout=(30, 300))
+            if resp.ok and "\n1 " in resp.text:
+                text = resp.text
+                break
+            print(f"{name} attempt {attempt}: HTTP {resp.status_code} {resp.text[:150]!r}")
+        except requests.RequestException as exc:
+            print(f"{name} attempt {attempt}: {exc}")
+        time.sleep(15 * attempt)
+    if text:
+        (cur / f"{name}.txt").write_text(text)
+        print(f"{name}: {text.count(chr(10)) // 3} objects")
         ok += 1
     else:
-        print(f"FAILED {name}: HTTP {resp.status_code} {resp.text[:150]!r}")
+        print(f"FAILED {name}; keeping last good copy")
         # keep publishing the last good copy instead of nothing
         if (prev / f"{name}.txt").exists():
             shutil.copy(prev / f"{name}.txt", cur / f"{name}.txt")
     time.sleep(2)
 
+if not any(cur.iterdir()):
+    sys.exit("CelesTrak download failed for every group and no previous copy exists")
 if ok == 0:
-    sys.exit("CelesTrak download failed for every group")
+    print("::warning::CelesTrak unreachable this run; republished the last good data")
