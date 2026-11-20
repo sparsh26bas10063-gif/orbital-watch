@@ -1,5 +1,6 @@
 """Orbital Watch web app.  Run:  python app.py   then open http://127.0.0.1:5000"""
 import math
+import os
 import threading
 import time
 from datetime import date, datetime
@@ -13,16 +14,17 @@ import satellites
 
 app = Flask(__name__)
 
-_catalog = {"sats": None, "loaded": 0.0}
+ON_VERCEL = bool(os.getenv("VERCEL"))
+_catalogs = {}   # which -> {"sats": [...], "loaded": t}
 _lock = threading.Lock()
 
 
-def get_catalog():
+def get_catalog(which: str = "current"):
     with _lock:
-        if _catalog["sats"] is None or time.time() - _catalog["loaded"] > satellites.CACHE_HOURS * 3600:
-            _catalog["sats"] = satellites.fetch_catalog()
-            _catalog["loaded"] = time.time()
-        return _catalog["sats"]
+        c = _catalogs.get(which)
+        if c is None or not c["sats"] or time.time() - c["loaded"] > satellites.CACHE_HOURS * 3600:
+            c = _catalogs[which] = {"sats": satellites.fetch_catalog(which=which), "loaded": time.time()}
+        return c["sats"]
 
 
 def clean(obj):
@@ -70,12 +72,15 @@ def api_asteroids():
 @api
 def api_catalog():
     sats = get_catalog()
-    return {"count": len(sats), "loaded": datetime.fromtimestamp(_catalog["loaded"])}
+    return {"count": len(sats), "loaded": datetime.fromtimestamp(_catalogs["current"]["loaded"])}
 
 
 @app.route("/api/disturbances")
 @api
 def api_disturbances():
+    if ON_VERCEL:
+        # serverless: no persistent disk, so compare with the older copy kept by the GitHub Action
+        return satellites.detect_disturbances(get_catalog(), previous_sats=get_catalog("previous"))
     return satellites.detect_disturbances(get_catalog())
 
 

@@ -17,6 +17,11 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 HTTP_TIMEOUT = 60
+
+# Mirror of CelesTrak data refreshed every 6 h by .github/workflows/update-tle.yml (branch "tle-data").
+_owner = os.getenv("VERCEL_GIT_REPO_OWNER", "sparsh26bas10063-gif")
+_repo = os.getenv("VERCEL_GIT_REPO_SLUG", "orbital-watch")
+TLE_MIRROR_URL = os.getenv("TLE_MIRROR_URL", f"https://raw.githubusercontent.com/{_owner}/{_repo}/tle-data")
 USER_AGENT = "orbital-watch-student-project/1.0"
 
 # Physical constants

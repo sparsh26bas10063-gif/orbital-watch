@@ -7,7 +7,7 @@ import numpy as np
 import requests
 from sgp4.api import Satrec, SatrecArray, jday
 
-from config import DATA_DIR, EARTH_RADIUS_KM, HTTP_TIMEOUT, MU_EARTH, USER_AGENT
+from config import DATA_DIR, EARTH_RADIUS_KM, HTTP_TIMEOUT, MU_EARTH, TLE_MIRROR_URL, USER_AGENT
 
 CELESTRAK_URL = "https://celestrak.org/NORAD/elements/gp.php"
 CACHE_HOURS = 2  # CelesTrak updates data every ~2 h and asks clients not to download more often
@@ -47,14 +47,30 @@ class Sat:
         return datetime(2000, 1, 1, 12, tzinfo=timezone.utc) + timedelta(days=self.epoch_jd - 2451545.0)
 
 
-def _download(name: str, params: dict) -> str:
-    cache = DATA_DIR / f"tle_{name}.txt"
+def _from_mirror(name: str, which: str) -> str | None:
+    """Fetch the copy saved by the GitHub Action (fast, no CelesTrak rate limits)."""
+    try:
+        resp = requests.get(f"{TLE_MIRROR_URL}/{which}/{name}.txt",
+                            headers={"User-Agent": USER_AGENT}, timeout=30)
+        if resp.ok and "\n1 " in resp.text:
+            return resp.text
+    except requests.RequestException:
+        pass
+    return None
+
+
+def _download(name: str, params: dict, which: str = "current") -> str:
+    cache = DATA_DIR / (f"tle_{name}.txt" if which == "current" else f"tle_{which}_{name}.txt")
     if cache.exists() and time.time() - cache.stat().st_mtime < CACHE_HOURS * 3600:
         return cache.read_text()
-    resp = requests.get(CELESTRAK_URL, params={**params, "FORMAT": "tle"},
-                        headers={"User-Agent": USER_AGENT}, timeout=HTTP_TIMEOUT)
-    resp.raise_for_status()
-    text = resp.text
+    text = _from_mirror(name, which)
+    if text is None and which != "current":
+        raise RuntimeError(f"no {which} data in mirror yet")
+    if text is None:
+        resp = requests.get(CELESTRAK_URL, params={**params, "FORMAT": "tle"},
+                            headers={"User-Agent": USER_AGENT}, timeout=HTTP_TIMEOUT)
+        resp.raise_for_status()
+        text = resp.text
     if "\n1 " not in text:
         # CelesTrak returns a plain-text message on errors / rate limiting
         if cache.exists():
@@ -78,13 +94,16 @@ def parse_tles(text: str) -> list[Sat]:
     return sats
 
 
-def fetch_catalog(queries: dict | None = None) -> list[Sat]:
-    """Download (or load cached) TLEs for all queries, de-duplicated by NORAD id."""
+def fetch_catalog(queries: dict | None = None, which: str = "current") -> list[Sat]:
+    """Download (or load cached) TLEs for all queries, de-duplicated by NORAD id.
+
+    which="previous" loads the older copy kept by the GitHub Action (used for change detection).
+    """
     queries = queries or CATALOG_QUERIES
     by_id: dict[int, Sat] = {}
     for name, params in queries.items():
         try:
-            sats = parse_tles(_download(name, params))
+            sats = parse_tles(_download(name, params, which))
             print(f"  {name:<22} {len(sats):>6} objects")
             for s in sats:
                 by_id[s.norad] = s
@@ -101,7 +120,7 @@ def _snapshot(sats: list[Sat]) -> dict:
             for s in sats}
 
 
-def detect_disturbances(sats: list[Sat], save: bool = True,
+def detect_disturbances(sats: list[Sat], save: bool = True, previous_sats: list[Sat] | None = None,
                         da_km: float = 1.0, dinc_deg: float = 0.02, decay_km_per_day: float = 0.5) -> dict:
     """Compare current orbits with the previously saved snapshot.
 
@@ -112,7 +131,10 @@ def detect_disturbances(sats: list[Sat], save: bool = True,
       REENTRY-RISK                : perigee below 200 km right now
     """
     current = _snapshot(sats)
-    previous = json.loads(SNAPSHOT_FILE.read_text()) if SNAPSHOT_FILE.exists() else {}
+    if previous_sats is not None:            # compare with an explicit older catalog (website mode)
+        previous, save = _snapshot(previous_sats), False
+    else:
+        previous = json.loads(SNAPSHOT_FILE.read_text()) if SNAPSHOT_FILE.exists() else {}
     had_baseline = bool(previous)
     events = []
 
