@@ -60,12 +60,38 @@ def index():
     return render_template("index.html", sites=oo.LAUNCH_SITES, missions=list(oo.MISSIONS))
 
 
+_ast_cache = {}   # key -> (time, data); NASA's DEMO_KEY allows only ~30 requests/hour
+
+
+def cached(key, ttl, fn):
+    hit = _ast_cache.get(key)
+    if hit and time.time() - hit[0] < ttl:
+        return hit[1]
+    try:
+        data = fn()
+    except Exception:
+        if hit:                      # serve stale data rather than nothing
+            return hit[1]
+        raise
+    _ast_cache[key] = (time.time(), data)
+    return data
+
+
 @app.route("/api/asteroids")
 @api
 def api_asteroids():
-    neos = asteroids.fetch_neo_feed()
-    cad = asteroids.fetch_jpl_close_approaches(days=int(request.args.get("days", 60)))
-    return {"neows": neos, "jpl": cad}
+    out = {"neows": [], "jpl": []}
+    try:
+        out["neows"] = cached("neows", 3600, asteroids.fetch_neo_feed)
+    except Exception as exc:
+        out["neows_error"] = ("NASA DEMO_KEY rate limit reached; try again later or set NASA_API_KEY"
+                              if "429" in str(exc) else str(exc))
+    days = int(request.args.get("days", 60))
+    try:
+        out["jpl"] = cached(f"jpl{days}", 3600, lambda: asteroids.fetch_jpl_close_approaches(days=days))
+    except Exception as exc:
+        out["jpl_error"] = str(exc)
+    return out
 
 
 @app.route("/api/catalog")
@@ -98,6 +124,31 @@ def api_conjunctions():
     return {"target": {"name": target.name, "norad": target.norad, "perigee_km": target.perigee_km,
                        "apogee_km": target.apogee_km, "inc_deg": target.inc_deg, "epoch": target.epoch},
             "events": events}
+
+
+@app.route("/api/orbits")
+@api
+def api_orbits():
+    """Compact orbital elements so the browser can animate satellites on the 3D globe."""
+    cat = get_catalog()
+    ids = request.args.get("ids")
+    if ids:
+        want = {int(x) for x in ids.split(",") if x.strip().isdigit()}
+        sats = [s for s in cat if s.norad in want]
+    else:
+        limit = max(100, min(int(request.args.get("limit", 4000)), 20000))
+        sats = cat[::max(1, len(cat) // limit)]
+        have = {s.norad for s in sats}
+        sats += [s for s in cat if s.norad in (25544, 48274, 20580) and s.norad not in have]
+
+    def kind(name):
+        return "deb" if " DEB" in name else "rb" if "R/B" in name else "sat"
+
+    r = lambda x, d=6: round(float(x), d)
+    rows = [[s.norad, s.name, r(s.satrec.no_kozai, 9), r(s.ecc, 7), r(s.satrec.inclo), r(s.satrec.nodeo),
+             r(s.satrec.argpo), r(s.satrec.mo), r(s.epoch_jd, 6), kind(s.name)] for s in sats]
+    return {"total": len(cat), "fields": ["norad", "name", "n_rad_min", "ecc", "inc", "raan", "argp",
+                                          "M", "epoch_jd", "kind"], "sats": rows}
 
 
 @app.route("/api/optimize")

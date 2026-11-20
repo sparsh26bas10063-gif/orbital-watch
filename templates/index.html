@@ -4,81 +4,182 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Orbital Watch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <style>
   :root {
-    --bg: #0b0f1a; --panel: #121828; --panel2: #182036; --line: #263049;
-    --text: #e6e9f2; --muted: #8b93a8; --accent: #5b9dff; --good: #3ecf8e;
-    --warn: #f5b942; --bad: #ff5d6c;
+    --bg: #05070f; --panel: rgba(16, 22, 40, .72); --panel2: rgba(24, 32, 56, .9); --line: rgba(120, 150, 220, .16);
+    --text: #e8ecf7; --muted: #8d96ad; --accent: #5b9dff; --accent2: #9b7bff; --good: #3ecf8e;
+    --warn: #f5b942; --bad: #ff5d6c; --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text);
-         font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  header { padding: 28px 24px 0; max-width: 1200px; margin: 0 auto; }
-  h1 { margin: 0; font-size: 26px; letter-spacing: -0.02em; }
-  h1 span { color: var(--accent); }
-  .sub { color: var(--muted); margin: 4px 0 18px; }
-  nav { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
-  nav button { background: none; border: 0; color: var(--muted); padding: 10px 16px; font: inherit;
-               cursor: pointer; border-bottom: 2px solid transparent; }
-  nav button.active { color: var(--text); border-bottom-color: var(--accent); }
-  main { max-width: 1200px; margin: 0 auto; padding: 20px 24px 60px; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: radial-gradient(ellipse at top, #0d1430 0%, var(--bg) 60%) fixed; color: var(--text);
+         font: 14px/1.5 "Space Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; min-height: 100vh; }
+  #stars { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
+
+  header { padding: 26px 24px 0; max-width: 1240px; margin: 0 auto; }
+  h1 { margin: 0; font-size: clamp(26px, 4vw, 38px); letter-spacing: -0.03em; font-weight: 700;
+       background: linear-gradient(90deg, #fff 0%, #9cc3ff 35%, #b89cff 65%, #fff 100%); background-size: 200% auto;
+       -webkit-background-clip: text; background-clip: text; color: transparent; animation: shine 8s linear infinite; }
+  h1 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--good);
+            margin-left: 10px; vertical-align: middle; box-shadow: 0 0 0 0 rgba(62,207,142,.7); animation: pulse 2s infinite; }
+  .sub { color: var(--muted); margin: 4px 0 16px; }
+  @keyframes shine { to { background-position: 200% center; } }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(62,207,142,.6); } 70% { box-shadow: 0 0 0 10px rgba(62,207,142,0); } 100% { box-shadow: 0 0 0 0 rgba(62,207,142,0); } }
+
+  /* ---------- 3D globe hero ---------- */
+  .hero { max-width: 1240px; margin: 0 auto; padding: 0 24px; }
+  #globe-wrap { position: relative; height: min(64vh, 620px); min-height: 380px; border-radius: 16px; overflow: hidden;
+                border: 1px solid var(--line); background: radial-gradient(circle at 50% 50%, rgba(40,70,150,.25), rgba(0,0,0,0) 60%); }
+  #globe { position: absolute; inset: 0; cursor: grab; }
+  #globe:active { cursor: grabbing; }
+  #globe canvas { display: block; }
+  #globe-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .glabel { position: absolute; left: 0; top: 0; font: 500 11px var(--mono); color: #fff; white-space: nowrap;
+            padding: 2px 7px; border-radius: 6px; background: rgba(5,8,18,.7); border: 1px solid rgba(255,255,255,.18);
+            transform: translate(-50%, -100%); margin-top: -10px; will-change: transform; }
+  .glabel.planned { border-color: var(--good); color: var(--good); }
+  .glabel.conj { border-color: var(--bad); color: #ffb3ba; }
+  .glabel.reentry { border-color: var(--warn); color: var(--warn); }
+  .hud { position: absolute; font: 12px var(--mono); color: var(--muted); background: rgba(5,8,18,.6);
+         border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; backdrop-filter: blur(6px); }
+  .hud b { color: var(--text); font-weight: 500; }
+  .hud.tl { top: 12px; left: 12px; }
+  .hud.tr { top: 12px; right: 12px; display: flex; gap: 4px; align-items: center; flex-wrap: wrap; justify-content: flex-end; max-width: 60%; }
+  .hud.bl { bottom: 12px; left: 12px; display: flex; gap: 6px; flex-wrap: wrap; max-width: calc(100% - 24px); }
+  .hud .live { color: var(--good); }
+  .chip { border: 1px solid var(--line); background: transparent; color: var(--muted); font: 11px var(--mono);
+          border-radius: 99px; padding: 4px 10px; cursor: pointer; transition: all .2s; display: inline-flex; gap: 6px; align-items: center; }
+  .chip:hover { color: var(--text); border-color: rgba(255,255,255,.35); }
+  .chip.on { color: var(--text); background: rgba(91,157,255,.18); border-color: rgba(91,157,255,.6); }
+  .chip i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px currentColor; }
+  .globe-msg { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); }
+
+  nav { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 22px; border-bottom: 1px solid var(--line); position: relative; }
+  nav button { background: none; border: 0; color: var(--muted); padding: 11px 16px; font: inherit; font-weight: 500;
+               cursor: pointer; border-bottom: 2px solid transparent; transition: color .2s, border-color .3s; }
+  nav button:hover { color: var(--text); }
+  nav button.active { color: var(--text); border-bottom-color: var(--accent); text-shadow: 0 0 18px rgba(91,157,255,.7); }
+  main { max-width: 1240px; margin: 0 auto; padding: 20px 24px 60px; }
   section[hidden] { display: none; }
+  section.show { animation: rise .5s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
   .row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
-  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
-          padding: 14px 16px; flex: 1 1 180px; }
-  .stat b { display: block; font-size: 24px; font-variant-numeric: tabular-nums; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; flex: 1 1 180px;
+          backdrop-filter: blur(8px); transition: transform .25s, border-color .25s, box-shadow .25s; animation: rise .5s both; position: relative; overflow: hidden; }
+  .stat::after { content: ""; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,.06) 50%, transparent 70%);
+                 transform: translateX(-100%); animation: sweep 1.2s .2s ease-out both; }
+  @keyframes sweep { to { transform: translateX(100%); } }
+  .stat:hover { transform: translateY(-3px); border-color: rgba(91,157,255,.45); box-shadow: 0 10px 30px -12px rgba(91,157,255,.5); }
+  .stat b { display: block; font-size: 24px; font-variant-numeric: tabular-nums; font-weight: 700; }
   .stat small { color: var(--muted); }
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
-          padding: 16px; margin-bottom: 16px; }
-  .card h3 { margin: 0 0 4px; font-size: 15px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin-bottom: 16px;
+          backdrop-filter: blur(8px); }
+  .card h3 { margin: 0 0 4px; font-size: 16px; }
   .card p.note { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
   .table-wrap { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-  th, td { padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
-  th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
-  td.num, th.num { text-align: right; }
-  tr.top td { background: rgba(62, 207, 142, .08); }
-  .tag { display: inline-block; padding: 1px 7px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+  th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+  td.num, th.num { text-align: right; font-family: var(--mono); font-size: 13px; }
+  tbody tr { animation: rowIn .45s both; animation-delay: calc(var(--i, 0) * 45ms); transition: background .2s; }
+  tbody tr:hover { background: rgba(91,157,255,.07); }
+  @keyframes rowIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: none; } }
+  tr.top td { background: rgba(62, 207, 142, .09); }
+  .tag { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 11px; font-weight: 600; font-family: var(--mono); }
   .tag.bad { background: rgba(255,93,108,.15); color: var(--bad); }
   .tag.warn { background: rgba(245,185,66,.15); color: var(--warn); }
   .tag.good { background: rgba(62,207,142,.15); color: var(--good); }
   .tag.info { background: rgba(91,157,255,.15); color: var(--accent); }
-  form.controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; margin-bottom: 16px; }
+  form.controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; margin-bottom: 14px; }
   label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 12px; }
-  input, select { background: var(--panel2); color: var(--text); border: 1px solid var(--line);
-                  border-radius: 7px; padding: 8px 10px; font: inherit; min-width: 120px; }
-  button.go { background: var(--accent); color: #fff; border: 0; border-radius: 7px; padding: 9px 18px;
-              font: inherit; font-weight: 600; cursor: pointer; }
-  button.go:disabled { opacity: .5; cursor: wait; }
+  input, select { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 8px;
+                  padding: 8px 10px; font: inherit; min-width: 120px; transition: border-color .2s, box-shadow .2s; }
+  input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(91,157,255,.2); }
+  button.go { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; border: 0; border-radius: 8px;
+              padding: 9px 20px; font: inherit; font-weight: 700; cursor: pointer; transition: transform .15s, box-shadow .2s;
+              box-shadow: 0 6px 20px -8px rgba(91,157,255,.8); }
+  button.go:hover { transform: translateY(-1px); box-shadow: 0 10px 26px -8px rgba(155,123,255,.9); }
+  button.go:disabled { opacity: .55; cursor: wait; transform: none; }
   .loading { color: var(--muted); padding: 30px 0; text-align: center; }
+  .loading::before { content: ""; display: block; width: 38px; height: 38px; margin: 0 auto 12px; border-radius: 50%;
+                     border: 2px solid rgba(91,157,255,.18); border-top-color: var(--accent); border-right-color: var(--accent2);
+                     animation: spin .9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
   .error { color: var(--bad); padding: 12px; background: rgba(255,93,108,.08); border-radius: 8px; }
   .chart-box { position: relative; height: 340px; }
+  #flyby { width: 100%; height: 440px; display: block; border-radius: 12px;
+           background: radial-gradient(circle at 50% 50%, rgba(30,60,140,.25), rgba(0,0,0,0) 65%); }
   .reco { font-size: 18px; margin: 0; }
   .reco b { color: var(--good); }
+  .hint { color: var(--accent); font-size: 13px; margin-top: 10px; }
   footer { color: var(--muted); font-size: 12px; text-align: center; padding: 20px; }
-  @media (max-width: 600px) { header, main { padding-left: 16px; padding-right: 16px; } }
+  @media (max-width: 640px) {
+    header, main, .hero { padding-left: 16px; padding-right: 16px; }
+    .hud.tr { max-width: 100%; left: 12px; right: 12px; top: auto; bottom: 52px; justify-content: flex-start; }
+    #flyby { height: 340px; }
+  }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
 </style>
 </head>
 <body>
+<canvas id="stars"></canvas>
 <header>
-  <h1>Orbital <span>Watch</span></h1>
-  <p class="sub">Asteroid alerts, satellite disturbances, collision screening and launch-orbit planning using live NASA, JPL and CelesTrak data</p>
-  <nav>
-    <button data-tab="asteroids" class="active">Asteroids</button>
-    <button data-tab="disturb">Orbit disturbances</button>
-    <button data-tab="conj">Collision check</button>
-    <button data-tab="opt">Best orbit finder</button>
-  </nav>
+  <h1>Orbital Watch<span class="dot" title="live data"></span></h1>
+  <p class="sub">Live asteroid alerts, satellite disturbances, collision screening and launch-orbit planning: NASA, JPL &amp; CelesTrak data</p>
 </header>
 
+<div class="hero">
+  <div id="globe-wrap">
+    <div id="globe"></div>
+    <div id="globe-labels"></div>
+    <div class="hud tl">
+      <div><span class="live">● LIVE ORBITS</span></div>
+      <div id="g-time">–</div>
+      <div id="g-count">Loading satellites…</div>
+    </div>
+    <div class="hud tr" id="g-speed">
+      <span style="margin-right:4px">Time ×</span>
+      <button class="chip" data-speed="1">1</button>
+      <button class="chip on" data-speed="60">60</button>
+      <button class="chip" data-speed="600">600</button>
+      <button class="chip" data-speed="3600">3600</button>
+    </div>
+    <div class="hud bl" id="g-legend">
+      <button class="chip on" data-kind="leo"><i style="color:#5bd2ff;background:#5bd2ff"></i>LEO sats</button>
+      <button class="chip on" data-kind="meo"><i style="color:#f5c04a;background:#f5c04a"></i>MEO / GPS</button>
+      <button class="chip on" data-kind="geo"><i style="color:#ff78d6;background:#ff78d6"></i>GEO</button>
+      <button class="chip on" data-kind="deb"><i style="color:#ff5d6c;background:#ff5d6c"></i>Debris</button>
+      <button class="chip on" data-kind="rb"><i style="color:#ff9a3c;background:#ff9a3c"></i>Rocket bodies</button>
+    </div>
+  </div>
+</div>
+
 <main>
+  <nav>
+    <button data-tab="asteroids" class="active">☄ Asteroids</button>
+    <button data-tab="disturb">📡 Orbit disturbances</button>
+    <button data-tab="conj">⚠ Collision check</button>
+    <button data-tab="opt">🚀 Best orbit finder</button>
+  </nav>
+  <br>
+
   <!-- ================= ASTEROIDS ================= -->
-  <section id="asteroids">
+  <section id="asteroids" class="show">
     <div class="row" id="ast-stats"></div>
     <div class="card">
-      <h3>Asteroids passing Earth this week</h3>
-      <p class="note">NASA NeoWs. Each dot is one asteroid; red = potentially hazardous. Dashed line = Moon's distance.</p>
+      <h3>Asteroid fly-by: this week</h3>
+      <p class="note">Each asteroid's closest approach to Earth, drawn on a log scale. Dashed circle is the Moon's orbit; red objects are potentially hazardous; speed is proportional to real velocity.</p>
+      <canvas id="flyby"></canvas>
+    </div>
+    <div class="card">
+      <h3>Size vs. miss distance</h3>
+      <p class="note">NASA NeoWs. Red = potentially hazardous. Dashed line = Moon's distance.</p>
       <div class="chart-box"><canvas id="ast-chart"></canvas></div>
     </div>
     <div class="card">
@@ -98,7 +199,7 @@
     <div class="row" id="dist-stats"></div>
     <div class="card">
       <h3>Detected orbit disturbances</h3>
-      <p class="note">Each check saves a snapshot of every orbit and compares newer data with the last one. Run it again after a few hours to catch maneuvers and decay.</p>
+      <p class="note">Compares the latest orbits with an earlier snapshot to catch maneuvers, plane changes and decay. Re-entry candidates are marked on the globe.</p>
       <form class="controls" onsubmit="loadDisturb(); return false;">
         <button class="go" id="dist-btn">Run check now</button>
       </form>
@@ -110,7 +211,7 @@
   <section id="conj" hidden>
     <div class="card">
       <h3>Collision screening</h3>
-      <p class="note">Propagates the satellite and all objects at similar altitudes with SGP4 and lists close passes. TLE accuracy is about 1 km, so these are screening results, not predictions.</p>
+      <p class="note">Propagates the satellite and all objects at similar altitudes with SGP4 and lists close passes. The target and closest objects light up on the globe. TLE accuracy is about 1 km, so treat results as screening only.</p>
       <form class="controls" onsubmit="loadConj(); return false;">
         <label>Satellite NORAD ID<input id="c-norad" type="number" value="25544"></label>
         <label>Hours ahead<input id="c-hours" type="number" value="24" min="1" max="72"></label>
@@ -126,7 +227,7 @@
   <section id="opt" hidden>
     <div class="card">
       <h3>Find the best orbit for a new satellite</h3>
-      <p class="note">Scores each altitude and inclination on crowding from the real catalog, launch Δv, orbital lifetime against the 5-year deorbit rule, and mission fit.</p>
+      <p class="note">Scores each altitude and inclination on crowding in the real catalog, launch Δv, orbital lifetime against the 5-year deorbit rule, and mission fit. The winner is flown on the globe.</p>
       <form class="controls" onsubmit="loadOpt(); return false;">
         <label>Mission
           <select id="o-mission">{% for m in missions %}<option>{{ m }}</option>{% endfor %}</select></label>
@@ -145,48 +246,479 @@
     </div>
   </section>
 </main>
-<footer>Data: NASA NeoWs · NASA/JPL SBDB · CelesTrak. For education and prototyping, not operational use.</footer>
+<footer>Data: NASA NeoWs · NASA/JPL SBDB · CelesTrak · Earth imagery: NASA Blue Marble &amp; Black Marble. For education and prototyping, not operational use.</footer>
 
 <script>
 const $ = s => document.querySelector(s);
 const fmt = (n, d = 0) => n == null ? "–" : Number(n).toLocaleString(undefined, {minimumFractionDigits: d, maximumFractionDigits: d});
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const charts = {};
-Chart.defaults.color = "#8b93a8"; Chart.defaults.borderColor = "#263049";
+Chart.defaults.color = "#8d96ad"; Chart.defaults.borderColor = "rgba(120,150,220,.16)";
+Chart.defaults.font.family = '"Space Grotesk", system-ui, sans-serif';
 
 async function getJSON(url) {
   const r = await fetch(url); const j = await r.json();
   if (!r.ok || j.error) throw new Error(j.error || r.statusText);
   return j;
 }
-function stat(label, value, cls = "") { return `<div class="stat"><small>${label}</small><b class="${cls}">${value}</b></div>`; }
+function stat(label, value, delay = 0) {
+  const v = typeof value === "number" ? `<b data-count="${value}">0</b>` : `<b>${value}</b>`;
+  return `<div class="stat" style="animation-delay:${delay * 80}ms"><small>${label}</small>${v}</div>`;
+}
+function runCounters(root) {
+  root.querySelectorAll("[data-count]").forEach(el => {
+    const to = +el.dataset.count, t0 = performance.now(), dur = REDUCED ? 1 : 1100;
+    const step = now => {
+      const p = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmt(to * e);
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+}
+function setStats(sel, html) { const el = $(sel); el.innerHTML = html; runCounters(el); }
 function table(cols, rows, topFirst = false) {
-  if (!rows.length) return '<div class="loading">Nothing found.</div>';
+  if (!rows.length) return '<p class="note">Nothing found.</p>';
   return `<table><thead><tr>${cols.map(c => `<th class="${c.num ? "num" : ""}">${c.h}</th>`).join("")}</tr></thead><tbody>` +
-    rows.map((r, i) => `<tr class="${topFirst && i === 0 ? "top" : ""}">${cols.map(c => `<td class="${c.num ? "num" : ""}">${c.f(r)}</td>`).join("")}</tr>`).join("") +
+    rows.map((r, i) => `<tr style="--i:${Math.min(i, 20)}" class="${topFirst && i === 0 ? "top" : ""}">${cols.map(c => `<td class="${c.num ? "num" : ""}">${c.f(r, i)}</td>`).join("")}</tr>`).join("") +
     "</tbody></table>";
 }
 function busy(btn, on, label) { btn.disabled = on; btn.dataset.l ??= btn.textContent; btn.textContent = on ? label : btn.dataset.l; }
 
-// ---------- tabs ----------
+/* =====================================================================
+   Starfield background with twinkling stars and shooting stars
+   ===================================================================== */
+(() => {
+  const c = $("#stars"), x = c.getContext("2d");
+  let W, H, stars = [], meteors = [], nextMeteor = 2000;
+  function resize() {
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    W = innerWidth; H = innerHeight; c.width = W * dpr; c.height = H * dpr; x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    stars = Array.from({length: Math.round(W * H / 4500)}, () => ({
+      x: Math.random() * W, y: Math.random() * H, r: Math.random() * 1.2 + .2,
+      t: Math.random() * 6.28, s: .5 + Math.random() * 1.5, hue: Math.random() < .15 ? 210 : Math.random() < .1 ? 30 : 0}));
+  }
+  resize(); addEventListener("resize", resize);
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(50, now - last); last = now;
+    x.clearRect(0, 0, W, H);
+    for (const s of stars) {
+      s.t += dt * .001 * s.s;
+      const a = REDUCED ? .7 : .35 + .65 * (.5 + .5 * Math.sin(s.t));
+      x.fillStyle = s.hue ? `hsla(${s.hue},80%,80%,${a})` : `rgba(255,255,255,${a})`;
+      x.beginPath(); x.arc(s.x, s.y, s.r, 0, 6.283); x.fill();
+    }
+    if (!REDUCED) {
+      nextMeteor -= dt;
+      if (nextMeteor < 0) {
+        nextMeteor = 3500 + Math.random() * 6000;
+        const ang = .5 + Math.random() * .5;
+        meteors.push({x: Math.random() * W * .8, y: Math.random() * H * .4, vx: Math.cos(ang) * .9, vy: Math.sin(ang) * .9, life: 1});
+      }
+      meteors = meteors.filter(m => m.life > 0);
+      for (const m of meteors) {
+        m.x += m.vx * dt; m.y += m.vy * dt; m.life -= dt / 900;
+        const g = x.createLinearGradient(m.x, m.y, m.x - m.vx * 120, m.y - m.vy * 120);
+        g.addColorStop(0, `rgba(255,255,255,${m.life})`); g.addColorStop(1, "rgba(155,190,255,0)");
+        x.strokeStyle = g; x.lineWidth = 1.6; x.beginPath(); x.moveTo(m.x, m.y); x.lineTo(m.x - m.vx * 120, m.y - m.vy * 120); x.stroke();
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+
+/* =====================================================================
+   3D globe: real satellites propagated in the browser
+   (Kepler + J2 secular drift from the latest TLE elements)
+   ===================================================================== */
+const Globe = (() => {
+  const wrap = $("#globe"), labelsEl = $("#globe-labels");
+  if (!window.THREE || !THREE.OrbitControls) {
+    wrap.innerHTML = '<div class="globe-msg">3D view needs WebGL and could not load.</div>'; return null;
+  }
+  const MU = 398600.4418, RE = 6378.137, J2 = 1.08262668e-3, D2R = Math.PI / 180, TAU = Math.PI * 2;
+  const COLORS = {leo: [0.36, 0.82, 1.0], meo: [0.96, 0.75, 0.29], geo: [1.0, 0.47, 0.84], deb: [1.0, 0.36, 0.42], rb: [1.0, 0.6, 0.24]};
+  const SIZES = {leo: 0.016, meo: 0.03, geo: 0.034, deb: 0.013, rb: 0.02};
+
+  let renderer;
+  try { renderer = new THREE.WebGLRenderer({antialias: true, alpha: true}); }
+  catch (e) { wrap.innerHTML = '<div class="globe-msg">WebGL is not available in this browser.</div>'; return null; }
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+  wrap.appendChild(renderer.domElement);
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 500);
+  camera.position.set(2.2, 1.6, 3.4);
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  Object.assign(controls, {enableDamping: true, dampingFactor: .06, minDistance: 1.35, maxDistance: 22, enablePan: false,
+                           autoRotate: !REDUCED, autoRotateSpeed: .35, rotateSpeed: .6, zoomSpeed: .8});
+  controls.addEventListener("start", () => controls.autoRotate = false);
+
+  // distant stars
+  {
+    const n = 2500, p = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      const u = Math.random() * 2 - 1, t = Math.random() * TAU, r = 120 + Math.random() * 60, s = Math.sqrt(1 - u * u);
+      p.set([r * s * Math.cos(t), r * u, r * s * Math.sin(t)], i * 3);
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(p, 3));
+    scene.add(new THREE.Points(g, new THREE.PointsMaterial({color: 0xaabbff, size: 1.3, sizeAttenuation: false, transparent: true, opacity: .7})));
+  }
+
+  // Earth with day/night shader
+  const loader = new THREE.TextureLoader(); loader.setCrossOrigin("anonymous");
+  const earthU = {dayTex: {value: null}, nightTex: {value: null}, sunDir: {value: new THREE.Vector3(1, 0, 0)}, hasTex: {value: 0}};
+  loader.load("https://unpkg.com/three-globe@2.31.0/example/img/earth-blue-marble.jpg",
+    t => { t.anisotropy = 8; earthU.dayTex.value = t; earthU.hasTex.value = 1; },
+    undefined,
+    () => loader.load("https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/planets/earth_atmos_2048.jpg",
+                      t => { earthU.dayTex.value = t; earthU.hasTex.value = 1; }));
+  loader.load("https://unpkg.com/three-globe@2.31.0/example/img/earth-night.jpg", t => earthU.nightTex.value = t);
+  const earth = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 96), new THREE.ShaderMaterial({
+    uniforms: earthU,
+    vertexShader: `varying vec2 vUv; varying vec3 vN;
+      void main(){ vUv = uv; vN = normalize(mat3(modelMatrix) * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `uniform sampler2D dayTex; uniform sampler2D nightTex; uniform vec3 sunDir; uniform float hasTex;
+      varying vec2 vUv; varying vec3 vN;
+      void main(){
+        float d = dot(normalize(vN), normalize(sunDir));
+        vec3 base = vec3(0.05, 0.18, 0.42);
+        vec3 day = mix(base, texture2D(dayTex, vUv).rgb, hasTex);
+        vec3 night = texture2D(nightTex, vUv).rgb * vec3(1.6, 1.35, 1.0) * hasTex + vec3(0.006, 0.012, 0.035);
+        float t = smoothstep(-0.12, 0.22, d);
+        vec3 c = mix(night, day * (0.3 + 0.95 * max(d, 0.0)), t);
+        float twilight = (1.0 - abs(d) * 5.0); c += vec3(0.25, 0.09, 0.02) * max(twilight, 0.0) * 0.35;
+        gl_FragColor = vec4(c, 1.0);
+      }`
+  }));
+  scene.add(earth);
+
+  // atmosphere glow
+  scene.add(new THREE.Mesh(new THREE.SphereGeometry(1.12, 64, 64), new THREE.ShaderMaterial({
+    vertexShader: `varying vec3 vN; void main(){ vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `varying vec3 vN; void main(){ float i = pow(0.68 - dot(vN, vec3(0.0, 0.0, 1.0)), 2.6); gl_FragColor = vec4(0.35, 0.62, 1.0, 1.0) * i; }`,
+    blending: THREE.AdditiveBlending, side: THREE.BackSide, transparent: true, depthWrite: false
+  })));
+
+  // shared glowing-point shader
+  const pointUniforms = () => ({uScale: {value: 600}, uTime: {value: 0}, uPulse: {value: 0}});
+  const pointMat = u => new THREE.ShaderMaterial({
+    uniforms: u, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    vertexShader: `attribute float aSize; attribute vec3 aColor; uniform float uScale; uniform float uTime; uniform float uPulse; varying vec3 vC;
+      void main(){ vC = aColor; vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        float pulse = 1.0 + uPulse * 0.35 * sin(uTime * 4.0 + position.x * 10.0);
+        gl_PointSize = max(aSize * uScale / -mv.z * pulse, aSize > 0.0 ? 1.5 : 0.0); gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `varying vec3 vC; void main(){ vec2 p = gl_PointCoord - 0.5; float r = length(p); if (r > 0.5) discard;
+        float a = smoothstep(0.5, 0.05, r); float core = smoothstep(0.2, 0.0, r);
+        gl_FragColor = vec4(vC * a + vec3(core) * 0.55, a); }`
+  });
+
+  // ---------- orbital mechanics ----------
+  const nowJD = () => Date.now() / 86400000 + 2440587.5;
+  const gmst = jd => ((280.46061837 + 360.98564736629 * (jd - 2451545)) % 360) * D2R;
+  function sunECI(jd) {
+    const d = jd - 2451545, g = (357.529 + 0.98560028 * d) * D2R, q = (280.459 + 0.98564736 * d) * D2R;
+    const L = q + (1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g)) * D2R, e = 23.439 * D2R;
+    return {x: Math.cos(L), y: Math.cos(e) * Math.sin(L), z: Math.sin(e) * Math.sin(L), ra: Math.atan2(Math.cos(e) * Math.sin(L), Math.cos(L))};
+  }
+  function prep(r) {
+    const [id, name, n, e, i, raan, argp, M0, ejd, kind0] = r;
+    const nS = n / 60, a = Math.cbrt(MU / (nS * nS)), p = a * (1 - e * e), k = 1.5 * J2 * (RE / p) ** 2 * n;
+    const alt = a - RE;
+    const kind = kind0 === "sat" ? (alt < 2000 ? "leo" : alt < 30000 ? "meo" : "geo") : kind0;
+    return {id, name, n, e, i, raan, argp, M0, ejd, kind, a, alt, sq: Math.sqrt(1 - e * e),
+            draan: -k * Math.cos(i), dargp: k * (2 - 2.5 * Math.sin(i) ** 2)};
+  }
+  function eci(s, jd, out) {
+    const dt = (jd - s.ejd) * 1440;
+    const M = ((s.M0 + s.n * dt) % TAU + TAU) % TAU;
+    let E = s.e > 0.8 ? Math.PI : M;
+    if (s.e > 1e-4) for (let k = 0; k < 8; k++) E -= (E - s.e * Math.sin(E) - M) / (1 - s.e * Math.cos(E));
+    const xp = s.a * (Math.cos(E) - s.e), yp = s.a * s.sq * Math.sin(E);
+    const W = s.raan + s.draan * dt, w = s.argp + s.dargp * dt;
+    const cW = Math.cos(W), sW = Math.sin(W), cw = Math.cos(w), sw = Math.sin(w), ci = Math.cos(s.i), si = Math.sin(s.i);
+    const X = xp * (cW * cw - sW * sw * ci) - yp * (cW * sw + sW * cw * ci);
+    const Y = xp * (sW * cw + cW * sw * ci) + yp * (cW * cw * ci - sW * sw);
+    const Z = xp * (sw * si) + yp * (cw * si);
+    out[0] = X / RE; out[1] = Z / RE; out[2] = -Y / RE;   // ECI -> three.js (y up)
+    return out;
+  }
+
+  // ---------- state ----------
+  let simJD = nowJD(), speed = REDUCED ? 1 : 60, total = 0;
+  let sats = [], mainGeo = null, mainU = pointUniforms();
+  const visibleKinds = new Set(["leo", "meo", "geo", "deb", "rb"]);
+  const groups = {};      // name -> [{s, color, size, label, cls, orbit(bool)}]
+  let spGeo = null, spPts = null, spList = [], spU = pointUniforms(); spU.uPulse.value = 1;
+  const orbitLines = [];
+  const tmp = [0, 0, 0];
+
+  function buildMain() {
+    const n = sats.length;
+    mainGeo = new THREE.BufferGeometry();
+    mainGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+    mainGeo.setAttribute("aColor", new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+    mainGeo.setAttribute("aSize", new THREE.BufferAttribute(new Float32Array(n), 1));
+    sats.forEach((s, i) => mainGeo.attributes.aColor.array.set(COLORS[s.kind] || COLORS.leo, i * 3));
+    applySizes();
+    const pts = new THREE.Points(mainGeo, pointMat(mainU)); pts.frustumCulled = false; scene.add(pts);
+  }
+  function applySizes() {
+    if (!mainGeo) return;
+    const a = mainGeo.attributes.aSize.array;
+    sats.forEach((s, i) => a[i] = visibleKinds.has(s.kind) ? SIZES[s.kind] : 0);
+    mainGeo.attributes.aSize.needsUpdate = true;
+    $("#g-count").innerHTML = `<b>${fmt(sats.filter(s => visibleKinds.has(s.kind)).length)}</b> of ${fmt(total)} tracked objects shown`;
+  }
+
+  function rebuildSpecials() {
+    if (spPts) { scene.remove(spPts); spGeo.dispose(); }
+    orbitLines.splice(0).forEach(l => { scene.remove(l.line); l.line.geometry.dispose(); });
+    labelsEl.innerHTML = "";
+    spList = Object.values(groups).flat();
+    if (!spList.length) { spPts = null; return; }
+    spGeo = new THREE.BufferGeometry();
+    spGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(spList.length * 3), 3));
+    spGeo.setAttribute("aColor", new THREE.BufferAttribute(new Float32Array(spList.flatMap(o => o.color)), 3));
+    spGeo.setAttribute("aSize", new THREE.BufferAttribute(new Float32Array(spList.map(o => o.size)), 1));
+    spPts = new THREE.Points(spGeo, pointMat(spU)); spPts.frustumCulled = false; scene.add(spPts);
+    for (const o of spList) {
+      if (o.label) {
+        o.el = document.createElement("div"); o.el.className = "glabel " + (o.cls || ""); o.el.textContent = o.label;
+        labelsEl.appendChild(o.el);
+      }
+      if (o.orbit) {
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(241 * 3), 3));
+        const line = new THREE.Line(geo, new THREE.LineBasicMaterial({color: new THREE.Color(...o.color), transparent: true, opacity: .55,
+                                                                      blending: THREE.AdditiveBlending, depthWrite: false}));
+        line.frustumCulled = false; scene.add(line); orbitLines.push({line, s: o.s});
+      }
+    }
+    updateOrbitLines();
+  }
+  function updateOrbitLines() {
+    for (const {line, s} of orbitLines) {
+      const arr = line.geometry.attributes.position.array, per = TAU / s.n / 1440;
+      for (let k = 0; k <= 240; k++) { eci(s, simJD + per * k / 240, tmp); arr.set(tmp, k * 3); }
+      line.geometry.attributes.position.needsUpdate = true;
+    }
+  }
+
+  function occluded(p) {
+    const c = camera.position, d = p.clone().sub(c), L = d.length(); d.divideScalar(L);
+    const t = -c.dot(d); if (t < 0 || t > L) return false;
+    return c.clone().addScaledVector(d, t).length() < 0.995;
+  }
+  const v3 = new THREE.Vector3();
+  function updateLabels() {
+    const w = wrap.clientWidth, h = wrap.clientHeight;
+    for (let i = 0; i < spList.length; i++) {
+      const o = spList[i]; if (!o.el) continue;
+      v3.fromArray(spGeo.attributes.position.array, i * 3);
+      const hidden = occluded(v3); v3.project(camera);
+      if (hidden || v3.z > 1 || Math.abs(v3.x) > 1.1 || Math.abs(v3.y) > 1.1) { o.el.style.display = "none"; continue; }
+      o.el.style.display = "";
+      o.el.style.transform = `translate(${(v3.x + 1) / 2 * w}px, ${(1 - v3.y) / 2 * h}px) translate(-50%, -100%)`;
+    }
+  }
+
+  // ---------- render loop ----------
+  function resize() {
+    const w = wrap.clientWidth, h = wrap.clientHeight;
+    renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
+    const sc = h / (2 * Math.tan(camera.fov * D2R / 2));
+    mainU.uScale.value = sc; spU.uScale.value = sc;
+  }
+  new ResizeObserver(resize).observe(wrap); resize();
+  let visible = true;
+  new IntersectionObserver(e => visible = e[0].isIntersecting).observe(wrap);
+
+  let last = performance.now(), frameN = 0, lastHud = 0;
+  function frame(now) {
+    requestAnimationFrame(frame);
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    simJD += dt * speed / 86400;
+    if (!visible) return;
+    earth.rotation.y = gmst(simJD);
+    const sun = sunECI(simJD); earthU.sunDir.value.set(sun.x, sun.z, -sun.y);
+    mainU.uTime.value = spU.uTime.value = now / 1000;
+    if (mainGeo) {
+      const a = mainGeo.attributes.position.array;
+      for (let i = 0; i < sats.length; i++) { eci(sats[i], simJD, tmp); a[i * 3] = tmp[0]; a[i * 3 + 1] = tmp[1]; a[i * 3 + 2] = tmp[2]; }
+      mainGeo.attributes.position.needsUpdate = true;
+    }
+    if (spGeo) {
+      const a = spGeo.attributes.position.array;
+      for (let i = 0; i < spList.length; i++) { eci(spList[i].s, simJD, tmp); a.set(tmp, i * 3); }
+      spGeo.attributes.position.needsUpdate = true;
+    }
+    if (++frameN % 45 === 0) updateOrbitLines();
+    controls.update();
+    renderer.render(scene, camera);
+    updateLabels();
+    if (now - lastHud > 250) {
+      lastHud = now;
+      const d = new Date((simJD - 2440587.5) * 86400000);
+      $("#g-time").innerHTML = `<b>${d.toISOString().slice(0, 19).replace("T", " ")}</b> UTC`;
+    }
+  }
+  requestAnimationFrame(frame);
+
+  // ---------- controls ----------
+  document.querySelectorAll("#g-speed .chip").forEach(b => b.onclick = () => {
+    speed = +b.dataset.speed;
+    document.querySelectorAll("#g-speed .chip").forEach(x => x.classList.toggle("on", x === b));
+  });
+  document.querySelectorAll("#g-legend .chip").forEach(b => b.onclick = () => {
+    const k = b.dataset.kind; visibleKinds.has(k) ? visibleKinds.delete(k) : visibleKinds.add(k);
+    b.classList.toggle("on", visibleKinds.has(k)); applySizes();
+  });
+
+  // ---------- public API ----------
+  const find = id => sats.find(s => s.id === id);
+  async function load() {
+    try {
+      const d = await getJSON("/api/orbits?limit=" + (innerWidth < 700 ? 2500 : 6000));
+      total = d.total;
+      sats = d.sats.map(prep).filter(s => s.alt > 120 && s.a < RE * 12);
+      buildMain();
+      const iss = find(25544), css = find(48274), hst = find(20580);
+      groups.default = [
+        iss && {s: iss, color: [1, 1, 1], size: .055, label: "ISS", orbit: true},
+        css && {s: css, color: [1, .9, .55], size: .045, label: "Tiangong"},
+        hst && {s: hst, color: [.75, .85, 1], size: .04, label: "Hubble"},
+      ].filter(Boolean);
+      rebuildSpecials();
+    } catch (e) {
+      $("#g-count").textContent = "Satellite data unavailable: " + e.message;
+    }
+  }
+  async function showObjects(group, ids, {color, size = .05, labels = {}, orbitIds = [], cls = ""}) {
+    const missing = ids.filter(id => !find(id));
+    const extra = missing.length ? (await getJSON("/api/orbits?ids=" + missing.join(","))).sats.map(prep) : [];
+    const all = ids.map(id => find(id) || extra.find(s => s.id === id)).filter(Boolean);
+    groups[group] = all.map(s => ({s, color, size, label: labels[s.id], orbit: orbitIds.includes(s.id), cls}));
+    if (group !== "default" && orbitIds.length) groups.default = (groups.default || []).map(o => ({...o, orbit: false}));
+    rebuildSpecials();
+  }
+  function showPlanned(altKm, incDeg, mission) {
+    const a = RE + altKm, n = Math.sqrt(MU / a ** 3) * 60;
+    const sun = sunECI(simJD);
+    const raan = mission === "earth-observation" ? sun.ra + 157.5 * D2R : sun.ra;   // ~10:30 descending node for SSO
+    const s = prep([-1, "Your satellite", n, 0, incDeg * D2R, raan, 0, 0, simJD, "sat"]);
+    groups.planned = [{s, color: [.24, .95, .6], size: .07, label: `Your satellite · ${altKm} km · ${incDeg.toFixed(1)}°`, orbit: true, cls: "planned"}];
+    rebuildSpecials();
+    flyTo(3.6);
+  }
+  function clear(group) { delete groups[group]; rebuildSpecials(); }
+  function flyTo(dist) {
+    const from = camera.position.clone(), to = from.clone().setLength(dist), t0 = performance.now();
+    const step = now => { const p = Math.min(1, (now - t0) / 1200), e = p < .5 ? 2 * p * p : 1 - (-2 * p + 2) ** 2 / 2;
+                          camera.position.lerpVectors(from, to, e); if (p < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  }
+  load();
+  return {showObjects, showPlanned, clear};
+})();
+
+/* =====================================================================
+   Asteroid fly-by animation (2D canvas, log-scaled distances)
+   ===================================================================== */
+const Flyby = (() => {
+  const c = $("#flyby"), x = c.getContext("2d");
+  let W = 0, H = 0, objs = [], maxLd = 100, t = 0;
+  function resize() {
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    W = c.clientWidth; H = c.clientHeight; c.width = W * dpr; c.height = H * dpr; x.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  new ResizeObserver(resize).observe(c); resize();
+  const R = () => Math.min(W, H) / 2 - 24;
+  const scale = ld => 26 + (R() - 26) * Math.log10(1 + ld * 3) / Math.log10(1 + maxLd * 3);
+  function set(neos) {
+    const list = [...neos].sort((a, b) => a.miss_ld - b.miss_ld).slice(0, 16);
+    maxLd = Math.max(2, ...list.map(n => n.miss_ld)) * 1.1;
+    objs = list.map((n, i) => ({...n, ang: (i * 2.399963) % (Math.PI * 2), phase: (i * 0.618) % 1, dir: i % 2 ? 1 : -1,
+                                spd: 0.025 + n.velocity_kms / 900, size: 1.6 + Math.log10(Math.max(n.diameter_m, 5)) * 1.1, trail: []}));
+  }
+  function ring(r, dash, color, label) {
+    x.setLineDash(dash); x.strokeStyle = color; x.lineWidth = 1;
+    x.beginPath(); x.arc(W / 2, H / 2, r, 0, Math.PI * 2); x.stroke(); x.setLineDash([]);
+    if (label) { x.fillStyle = "rgba(141,150,173,.8)"; x.font = "10px JetBrains Mono, monospace"; x.fillText(label, W / 2 + r * .707 + 4, H / 2 - r * .707); }
+  }
+  let last = performance.now(), visible = true;
+  new IntersectionObserver(e => visible = e[0].isIntersecting).observe(c);
+  function frame(now) {
+    requestAnimationFrame(frame);
+    const dt = Math.min(.05, (now - last) / 1000); last = now;
+    if (!visible || !W) return;
+    t += dt;
+    x.clearRect(0, 0, W, H);
+    const cx = W / 2, cy = H / 2;
+    for (const ld of [10, 50, 100, 200]) if (ld < maxLd) ring(scale(ld), [2, 6], "rgba(120,150,220,.14)", ld + " LD");
+    ring(scale(1), [5, 5], "rgba(200,210,255,.45)", "Moon");
+    const ma = t * .25, mr = scale(1);
+    x.fillStyle = "#cfd6e6"; x.beginPath(); x.arc(cx + Math.cos(ma) * mr, cy + Math.sin(ma) * mr, 3.2, 0, 7); x.fill();
+    // Earth
+    const g = x.createRadialGradient(cx, cy, 2, cx, cy, 26);
+    g.addColorStop(0, "#9fd3ff"); g.addColorStop(.35, "#2f7bff"); g.addColorStop(.6, "rgba(47,123,255,.25)"); g.addColorStop(1, "rgba(47,123,255,0)");
+    x.fillStyle = g; x.beginPath(); x.arc(cx, cy, 26, 0, 7); x.fill();
+    x.fillStyle = "#1f5fd6"; x.beginPath(); x.arc(cx, cy, 9, 0, 7); x.fill();
+    if (!objs.length) { x.fillStyle = "#8d96ad"; x.font = "13px Space Grotesk, sans-serif"; x.textAlign = "center"; x.fillText("Loading NASA asteroid data…", cx, cy + 50); x.textAlign = "left"; return; }
+    const L = R() * 1.6;
+    for (const o of objs) {
+      const s = ((t * o.spd + o.phase) % 1) * 2 - 1;                 // -1 .. 1, closest approach at 0
+      const r = scale(o.miss_ld), nx = Math.cos(o.ang), ny = Math.sin(o.ang);
+      const tx = -ny * o.dir, ty = nx * o.dir;                         // direction of travel
+      const px = cx + nx * r + tx * s * L, py = cy + ny * r + ty * s * L;
+      // trail
+      const tl = 26 + o.velocity_kms * 1.5, tr = x.createLinearGradient(px, py, px - tx * tl, py - ty * tl);
+      const col = o.hazardous ? "255,93,108" : o.miss_ld < 5 ? "245,185,66" : "155,190,255";
+      tr.addColorStop(0, `rgba(${col},.85)`); tr.addColorStop(1, `rgba(${col},0)`);
+      x.strokeStyle = tr; x.lineWidth = o.size; x.lineCap = "round";
+      x.beginPath(); x.moveTo(px, py); x.lineTo(px - tx * tl, py - ty * tl); x.stroke();
+      x.fillStyle = `rgb(${col})`; x.shadowColor = `rgb(${col})`; x.shadowBlur = 12;
+      x.beginPath(); x.arc(px, py, o.size, 0, 7); x.fill(); x.shadowBlur = 0;
+      if (Math.abs(s) < .18) {
+        const a = 1 - Math.abs(s) / .18;
+        x.strokeStyle = `rgba(${col},${a * .5})`; x.setLineDash([2, 3]); x.lineWidth = 1;
+        x.beginPath(); x.moveTo(cx, cy); x.lineTo(px, py); x.stroke(); x.setLineDash([]);
+        x.fillStyle = `rgba(232,236,247,${a})`; x.font = "11px JetBrains Mono, monospace";
+        x.fillText(`${o.name.replace(/[()]/g, "")}  ${fmt(o.miss_ld, 1)} LD · ${fmt(o.diameter_m)} m`, px + 8, py - 8);
+      }
+    }
+  }
+  requestAnimationFrame(frame);
+  return {set};
+})();
+
+/* =====================================================================
+   Tabs
+   ===================================================================== */
 const loaded = {};
 document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
   document.querySelectorAll("nav button").forEach(x => x.classList.toggle("active", x === b));
-  document.querySelectorAll("main section").forEach(s => s.hidden = s.id !== b.dataset.tab);
+  document.querySelectorAll("main section").forEach(s => { s.hidden = s.id !== b.dataset.tab; s.classList.toggle("show", !s.hidden); });
   if (!loaded[b.dataset.tab]) { loaded[b.dataset.tab] = true; ({conj: loadConj, opt: loadOpt, disturb: loadDisturb})[b.dataset.tab]?.(); }
+  history.replaceState(null, "", b.dataset.tab === "asteroids" ? location.pathname : "#" + b.dataset.tab);
 });
+// deep links: /#conj, /#opt, /#disturb
+if (location.hash.length > 1) document.querySelector(`nav button[data-tab="${location.hash.slice(1)}"]`)?.click();
 
-// ---------- asteroids ----------
+/* ---------- asteroids ---------- */
 async function loadAsteroids() {
   try {
-    const {neows, jpl} = await getJSON("/api/asteroids");
-    const haz = neows.filter(n => n.hazardous).length;
+    const {neows, jpl, neows_error, jpl_error} = await getJSON("/api/asteroids");
+    if (!neows.length && !jpl.length) throw new Error(neows_error || jpl_error || "no data");
+    Flyby.set(neows.length ? neows : jpl);
     const closest = [...jpl].sort((a, b) => a.miss_km - b.miss_km)[0];
-    $("#ast-stats").innerHTML =
-      stat("Asteroids this week", neows.length) +
-      stat("Potentially hazardous", haz) +
-      stat("Inside Moon's orbit", neows.filter(n => n.miss_ld < 1).length) +
-      stat("Closest in 60 days", closest ? `${esc(closest.name)} · ${fmt(closest.miss_ld, 2)} LD` : "–");
+    setStats("#ast-stats",
+      stat("Asteroids this week", neows.length, 0) +
+      stat("Potentially hazardous", neows.filter(n => n.hazardous).length, 1) +
+      stat("Inside Moon's orbit", neows.filter(n => n.miss_ld < 1).length, 2) +
+      stat("Closest in 60 days", closest ? `${esc(closest.name)} · ${fmt(closest.miss_ld, 2)} LD` : "–", 3));
 
     const flags = n => (n.hazardous ? '<span class="tag bad">PHA</span> ' : "") + (n.miss_ld < 1 ? '<span class="tag warn">inside Moon orbit</span>' : "");
     const cols = [
@@ -194,18 +726,19 @@ async function loadAsteroids() {
       {h: "Diameter (m)", num: 1, f: n => fmt(n.diameter_m)}, {h: "Miss (LD)", num: 1, f: n => fmt(n.miss_ld, 2)},
       {h: "Miss (km)", num: 1, f: n => fmt(n.miss_km)}, {h: "Speed (km/s)", num: 1, f: n => fmt(n.velocity_kms, 2)},
       {h: "Risk score", num: 1, f: n => fmt(n.risk, 2)}, {h: "", f: flags}];
-    $("#ast-table").innerHTML = table(cols, neows.slice(0, 15));
-    $("#cad-table").innerHTML = table(cols.slice(0, 7), jpl.slice(0, 15));
+    $("#ast-table").innerHTML = neows_error ? `<div class="error">${esc(neows_error)}. The 60-day JPL list below still works.</div>` : table(cols, neows.slice(0, 15));
+    $("#cad-table").innerHTML = jpl_error ? `<div class="error">${esc(jpl_error)}</div>` : table(cols.slice(0, 7), jpl.slice(0, 15));
 
     const pts = arr => arr.map(n => ({x: n.miss_ld, y: n.diameter_m, name: n.name}));
     const maxLd = Math.max(...neows.map(n => n.miss_ld), 2);
     charts.ast = new Chart($("#ast-chart"), {
       type: "scatter",
       data: {datasets: [
-        {label: "Not hazardous", data: pts(neows.filter(n => !n.hazardous)), backgroundColor: "#5b9dff", pointRadius: 5},
-        {label: "Potentially hazardous", data: pts(neows.filter(n => n.hazardous)), backgroundColor: "#ff5d6c", pointRadius: 6},
-        {label: "Moon distance", type: "line", data: [{x: 1, y: 1}, {x: 1, y: 5000}], borderColor: "#8b93a8", borderDash: [6, 4], pointRadius: 0}]},
+        {label: "Not hazardous", data: pts(neows.filter(n => !n.hazardous)), backgroundColor: "rgba(91,157,255,.85)", pointRadius: 5, pointHoverRadius: 8},
+        {label: "Potentially hazardous", data: pts(neows.filter(n => n.hazardous)), backgroundColor: "#ff5d6c", pointRadius: 7, pointHoverRadius: 10},
+        {label: "Moon distance", type: "line", data: [{x: 1, y: 1}, {x: 1, y: 5000}], borderColor: "#8d96ad", borderDash: [6, 4], pointRadius: 0}]},
       options: {maintainAspectRatio: false,
+        animation: {duration: REDUCED ? 0 : 1400, easing: "easeOutQuart", delay: c => c.type === "data" ? c.dataIndex * 35 : 0},
         scales: {x: {type: "logarithmic", min: 0.5, max: maxLd * 1.5, title: {display: true, text: "Miss distance (lunar distances)"}},
                  y: {type: "logarithmic", title: {display: true, text: "Estimated diameter (m)"}}},
         plugins: {tooltip: {callbacks: {label: c => c.raw.name ? `${c.raw.name}: ${fmt(c.raw.y)} m at ${fmt(c.raw.x, 1)} LD` : "Moon"}}}}
@@ -216,29 +749,32 @@ async function loadAsteroids() {
   }
 }
 
-// ---------- disturbances ----------
+/* ---------- disturbances ---------- */
 const typeTag = {"REENTRY-RISK": "bad", "DECAYING": "warn", "MANEUVER-UP": "info", "MANEUVER-DOWN": "info", "PLANE-CHANGE": "good"};
 async function loadDisturb() {
   const btn = $("#dist-btn"); busy(btn, true, "Checking…");
-  $("#dist-out").innerHTML = '<div class="loading">Loading ~18,000 orbits from CelesTrak…</div>';
+  $("#dist-out").innerHTML = '<div class="loading">Comparing ~18,000 orbits…</div>';
   try {
     const [cat, res] = await Promise.all([getJSON("/api/catalog"), getJSON("/api/disturbances")]);
     const count = t => res.events.filter(e => e.type === t).length;
-    $("#dist-stats").innerHTML = stat("Objects tracked", fmt(cat.count)) +
-      stat("Compared with baseline", fmt(res.compared)) +
-      stat("Re-entry risk", count("REENTRY-RISK")) +
-      stat("Maneuvers detected", count("MANEUVER-UP") + count("MANEUVER-DOWN") + count("PLANE-CHANGE"));
+    setStats("#dist-stats", stat("Objects tracked", cat.count, 0) +
+      stat("Compared with baseline", res.compared, 1) +
+      stat("Re-entry risk", count("REENTRY-RISK"), 2) +
+      stat("Maneuvers detected", count("MANEUVER-UP") + count("MANEUVER-DOWN") + count("PLANE-CHANGE"), 3));
     const note = res.baseline_existed ? "" :
-      '<p class="note">First run: a baseline snapshot was saved. Check again later to detect maneuvers and decay.</p>';
+      '<p class="note">No earlier snapshot to compare with yet; re-entry risks are still shown. Check again later to catch maneuvers and decay.</p>';
     $("#dist-out").innerHTML = note + table([
       {h: "Type", f: e => `<span class="tag ${typeTag[e.type] || "info"}">${e.type}</span>`},
       {h: "NORAD", num: 1, f: e => e.norad}, {h: "Name", f: e => esc(e.name)}, {h: "Detail", f: e => esc(e.detail)}],
-      res.events);
+      res.events) + (res.events.length ? '<p class="hint">↑ Flagged objects are highlighted in amber on the globe.</p>' : "");
+    const ids = [...new Set(res.events.map(e => e.norad))].slice(0, 25);
+    const labels = Object.fromEntries(res.events.slice(0, 6).map(e => [e.norad, `${e.name} · ${e.type.toLowerCase()}`]));
+    if (ids.length) Globe?.showObjects("disturb", ids, {color: [1, .75, .2], size: .05, labels, cls: "reentry"});
   } catch (e) { $("#dist-out").innerHTML = `<div class="error">${esc(e.message)}</div>`; }
   busy(btn, false);
 }
 
-// ---------- conjunctions ----------
+/* ---------- conjunctions ---------- */
 async function loadConj() {
   const btn = $("#conj-btn"); busy(btn, true, "Screening…");
   $("#conj-out").innerHTML = '<div class="loading">Propagating orbits… (10–30 s)</div>';
@@ -247,17 +783,23 @@ async function loadConj() {
     const {target: t, events} = await getJSON("/api/conjunctions?" + q);
     const sev = km => km < 5 ? "bad" : km < 10 ? "warn" : "info";
     $("#conj-out").innerHTML =
-      `<div class="row">${stat("Target", esc(t.name))}${stat("Orbit", `${fmt(t.perigee_km)} × ${fmt(t.apogee_km)} km`)}${stat("Inclination", fmt(t.inc_deg, 2) + "°")}${stat("Close passes", events.length)}</div>` +
+      `<div class="row" id="conj-stats">${stat("Target", esc(t.name), 0)}${stat("Orbit", `${fmt(t.perigee_km)} × ${fmt(t.apogee_km)} km`, 1)}${stat("Inclination", fmt(t.inc_deg, 2) + "°", 2)}${stat("Close passes", events.length, 3)}</div>` +
       table([
         {h: "Time (UTC)", f: e => e.time.slice(0, 19).replace("T", " ")},
         {h: "Object", f: e => esc(e.name)}, {h: "NORAD", num: 1, f: e => e.norad},
         {h: "Miss (km)", num: 1, f: e => `<span class="tag ${sev(e.miss_km)}">${fmt(e.miss_km, 2)}</span>`},
-        {h: "Rel. speed (km/s)", num: 1, f: e => fmt(e.rel_speed_kms, 2)}], events);
+        {h: "Rel. speed (km/s)", num: 1, f: e => fmt(e.rel_speed_kms, 2)}], events) +
+      '<p class="hint">↑ The target and its five closest encounters are shown in red on the globe.</p>';
+    runCounters($("#conj-stats"));
+    const top = events.slice(0, 5);
+    const labels = {[t.norad]: `${t.name} (target)`};
+    top.slice(0, 3).forEach(e => labels[e.norad] = `${e.name} · ${fmt(e.miss_km, 1)} km`);
+    Globe?.showObjects("conj", [t.norad, ...top.map(e => e.norad)], {color: [1, .3, .38], size: .055, labels, orbitIds: [t.norad], cls: "conj"});
   } catch (e) { $("#conj-out").innerHTML = `<div class="error">${esc(e.message)}</div>`; }
   busy(btn, false);
 }
 
-// ---------- optimizer ----------
+/* ---------- optimizer ---------- */
 async function loadOpt() {
   const btn = $("#opt-btn"); busy(btn, true, "Searching…");
   $("#opt-out").innerHTML = '<div class="loading">Scoring candidate orbits…</div>';
@@ -267,25 +809,28 @@ async function loadOpt() {
     const r = await getJSON("/api/optimize?" + q);
     const b = r.best[0];
     let html = b ? `<p class="reco">Recommended: <b>${b.alt_km} km</b> circular orbit at <b>${fmt(b.inc_deg, 2)}°</b> inclination` +
-      `${r.mission === "earth-observation" ? " (sun-synchronous)" : ""}. Period ${fmt(b.period_min, 1)} min, natural lifetime ≈ ${fmt(b.lifetime_yr, 1)} years.</p><br>` : "";
+      `${r.mission === "earth-observation" ? " (sun-synchronous)" : ""}. Period ${fmt(b.period_min, 1)} min, natural lifetime ≈ ${fmt(b.lifetime_yr, 1)} years.</p>` +
+      `<p class="hint">↑ Your satellite is now flying this orbit on the globe (green).</p><br>` : "";
     html += table([
-      {h: "#", f: x => r.best.indexOf(x) + 1}, {h: "Altitude (km)", num: 1, f: x => x.alt_km},
+      {h: "#", f: (x, i) => i + 1}, {h: "Altitude (km)", num: 1, f: x => x.alt_km},
       {h: "Inclination", num: 1, f: x => fmt(x.inc_deg, 2) + "°"}, {h: "Period (min)", num: 1, f: x => fmt(x.period_min, 1)},
       {h: "Objects in shell", num: 1, f: x => fmt(x.objects_in_shell)}, {h: "Launch Δv (km/s)", num: 1, f: x => fmt(x.dv_kms, 2)},
       {h: "Lifetime (yr)", num: 1, f: x => fmt(x.lifetime_yr, 1)}, {h: "Score", num: 1, f: x => `<b>${fmt(x.score, 1)}</b>`}],
       r.best, true);
     if (r.geo) html += `<p class="note" style="margin-top:12px">Alternative: GEO at ${fmt(r.geo.alt_km)} km, 0°, Δv ≈ ${fmt(r.geo.dv_kms, 2)} km/s. Much more expensive, but 3 satellites cover most of the globe.</p>`;
     $("#opt-out").innerHTML = html;
+    if (b) Globe?.showPlanned(b.alt_km, b.inc_deg, r.mission);
 
     $("#opt-chart-card").hidden = false;
     charts.opt?.destroy();
-    const best = new Set(r.best.map(x => x.alt_km));
+    const best = r.best.map(x => x.alt_km);
     charts.opt = new Chart($("#opt-chart"), {
       type: "bar",
       data: {labels: r.density.alt.map(a => Math.round(a)),
-             datasets: [{label: "Objects per 10⁹ km³", data: r.density.per_1e9_km3,
-               backgroundColor: r.density.alt.map(a => [...best].some(x => Math.abs(x - a) <= 12.5) ? (Math.abs(b.alt_km - a) <= 12.5 ? "#3ecf8e" : "#f5b942") : "#5b9dff")}]},
+             datasets: [{label: "Objects per 10⁹ km³", data: r.density.per_1e9_km3, borderRadius: 3,
+               backgroundColor: r.density.alt.map(a => b && Math.abs(b.alt_km - a) <= 12.5 ? "#3ecf8e" : best.some(x => Math.abs(x - a) <= 12.5) ? "#f5b942" : "rgba(91,157,255,.75)")}]},
       options: {maintainAspectRatio: false, plugins: {legend: {display: false}},
+        animation: {duration: REDUCED ? 0 : 1200, easing: "easeOutQuart", delay: c => c.type === "data" ? c.dataIndex * 12 : 0},
         scales: {y: {type: "logarithmic", title: {display: true, text: "Objects per 10⁹ km³"}},
                  x: {title: {display: true, text: "Altitude (km)"}, ticks: {maxTicksLimit: 20}}}}
     });
