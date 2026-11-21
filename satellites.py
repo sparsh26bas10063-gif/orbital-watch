@@ -67,10 +67,17 @@ def _download(name: str, params: dict, which: str = "current") -> str:
     if text is None and which != "current":
         raise RuntimeError(f"no {which} data in mirror yet")
     if text is None:
-        resp = requests.get(CELESTRAK_URL, params={**params, "FORMAT": "tle"},
-                            headers={"User-Agent": USER_AGENT}, timeout=HTTP_TIMEOUT)
-        resp.raise_for_status()
-        text = resp.text
+        try:
+            resp = requests.get(CELESTRAK_URL, params={**params, "FORMAT": "tle"},
+                                headers={"User-Agent": USER_AGENT}, timeout=HTTP_TIMEOUT)
+            resp.raise_for_status()
+            text = resp.text
+        except requests.RequestException as exc:
+            # CelesTrak blocks IPs that download too often (HTTP 403); a stale copy beats no data
+            if cache.exists():
+                print(f"  [warn] {exc} -> using older cache for {name}")
+                return cache.read_text()
+            raise
     if "\n1 " not in text:
         # CelesTrak returns a plain-text message on errors / rate limiting
         if cache.exists():

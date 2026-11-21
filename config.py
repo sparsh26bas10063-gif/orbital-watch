@@ -2,8 +2,21 @@
 import os
 from pathlib import Path
 
+# Load KEY=value lines from orbital_watch/.env (git-ignored) without extra dependencies.
+_env = Path(__file__).resolve().parent / ".env"
+if _env.exists():
+    for _line in _env.read_text(encoding="utf-8").splitlines():
+        _line = _line.strip()
+        if _line and not _line.startswith("#") and "=" in _line:
+            _k, _v = _line.split("=", 1)
+            os.environ.setdefault(_k.strip(), _v.strip().strip('"').strip("'"))
+
 # Free key from https://api.nasa.gov (DEMO_KEY works but is limited to ~30 requests/hour)
 NASA_API_KEY = os.getenv("NASA_API_KEY", "DEMO_KEY")
+
+# Optional: Google Photorealistic 3D in Earth View (Maps JavaScript API browser key, restrict it by website).
+# Without it, Earth View uses the free open 3D terrain.
+GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
 
 BASE_DIR = Path(__file__).resolve().parent
 if os.getenv("VERCEL"):

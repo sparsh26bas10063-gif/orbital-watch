@@ -156,8 +156,17 @@ def optimize(catalog, mission: str = "earth-observation", site_lat: float = 13.7
                                  np.clip(np.log10(life_arr / (mission_years + 5)) / 3, 0, 0.6), 0.0))
     wd, wv, wl, wf = cfg["w"]
     cost = wd * _norm(np.log10(dens_arr + 1e-12)) + wv * _norm(dv_arr) + wl * life_pen + wf * (1 - _norm(fit_arr))
-    for r, c in zip(rows, cost):
+    safety = 100 * (1 - _norm(np.log10(dens_arr + 1e-12)))
+    cost_s = 100 * (1 - _norm(dv_arr))
+    life_s = 100 * (1 - life_pen)
+    cover_s = 100 * _norm(fit_arr)
+    for k, (r, c) in enumerate(zip(rows, cost)):
         r["score"] = round(float(100 * (1 - c)), 1)
+        r["scores"] = {"safety": float(safety[k]), "lifetime": float(life_s[k]),
+                       "coverage": float(cover_s[k]), "launch_cost": float(cost_s[k])}
+        r["coverage_lat_deg"] = r["inc_deg"] if r["inc_deg"] <= 90 else 180 - r["inc_deg"]
+        r["footprint_km"] = EARTH_RADIUS_KM * math.acos(EARTH_RADIUS_KM / (EARTH_RADIUS_KM + r["alt_km"]))
+        r["why"] = _explain(r, mission, mission_years)
     rows.sort(key=lambda r: r["score"], reverse=True)
 
     # keep diverse results: skip near-duplicates of an already chosen orbit
@@ -168,6 +177,27 @@ def optimize(catalog, mission: str = "earth-observation", site_lat: float = 13.7
         if len(chosen) == top:
             break
     return chosen, (centers, dens)
+
+
+def _explain(r: dict, mission: str, mission_years: float) -> list[str]:
+    """Plain-language reasons behind a candidate's score."""
+    s, why = r["scores"], []
+    why.append("Quiet shell: few tracked objects nearby" if s["safety"] >= 66 else
+               "Moderately busy shell" if s["safety"] >= 33 else "Crowded shell: higher collision risk")
+    life = r["lifetime_yr"]
+    if life < mission_years:
+        why.append(f"Decays in ~{life:.1f} yr, before the {mission_years:g}-year mission ends")
+    elif life <= mission_years + 5:
+        why.append(f"Re-enters naturally in ~{life:.0f} yr: meets the 5-year deorbit rule, no debris left behind")
+    else:
+        why.append(f"Stays up ~{life:.0f} yr: needs a deorbit system to avoid becoming debris")
+    lat = r["coverage_lat_deg"]
+    if mission == "earth-observation":
+        why.append(f"Sun-synchronous: same lighting every pass, covers up to {lat:.0f}° latitude")
+    else:
+        why.append(f"Covers latitudes up to ±{lat:.0f}°, footprint radius ~{r['footprint_km']:.0f} km")
+    why.append("Cheap to reach from this launch site" if s["launch_cost"] >= 60 else "Needs extra launch energy")
+    return why
 
 
 def geo_option(site_lat: float) -> dict:
