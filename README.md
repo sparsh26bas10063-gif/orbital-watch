@@ -4,6 +4,11 @@
 
 *Know what's at risk in orbit today, and where it's safe to launch tomorrow.* Team AstroNex · ASTRA 2026.
 
+## Demo video
+[![OrbitGuard demo video](demo/orbitguard-demo-poster.png)](demo/orbitguard-demo.mp4)
+
+**[Watch the 4-minute demo](demo/orbitguard-demo.mp4)**: dashboard, Hubble (HST) in the Satellite Finder and collision check, NASA storm drag alerts, VIT Bhopal in Earth View 3D, riding under Hubble, the orbit recommender and more. Details in [demo/README.md](demo/README.md).
+
 A mission-control web dashboard: live 3D satellite globe (coloured by altitude), close-approach alerts,
 NASA space-weather drag warnings, a best-orbit recommender, a satellite finder (photo, mission, orbit)
 and a 3D Earth view that can ride along under any satellite. Built on free public data.
