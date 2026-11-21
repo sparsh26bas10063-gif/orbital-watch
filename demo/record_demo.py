@@ -73,28 +73,28 @@ OVERLAY = r"""
 (() => {
   const css = `#demo-cursor{position:fixed;left:0;top:0;width:26px;height:26px;z-index:2147483647;pointer-events:none;will-change:transform}
   #demo-cursor svg{width:26px;height:26px;filter:drop-shadow(0 3px 5px rgba(0,0,0,.7))}
-  .demo-ripple{position:fixed;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;border:3px solid #3ea6ff;z-index:2147483646;pointer-events:none;animation:demoRip .65s ease-out forwards}
+  .demo-ripple{position:fixed;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;border:3px solid #e50914;z-index:2147483646;pointer-events:none;animation:demoRip .65s ease-out forwards}
   @keyframes demoRip{to{transform:scale(3.4);opacity:0}}
   #demo-cap{position:fixed;left:50%;bottom:28px;transform:translate(-50%,24px);opacity:0;z-index:2147483645;pointer-events:none;
-    background:rgba(4,10,24,.9);border:1px solid rgba(62,166,255,.5);border-radius:20px;padding:13px 26px;max-width:78%;text-align:center;
+    background:linear-gradient(149deg,rgba(25,34,71,.92),rgba(33,14,23,.92));border:1px solid rgba(229,9,20,.55);border-radius:20px;padding:13px 26px;max-width:78%;text-align:center;
     font:600 21px Inter,system-ui,sans-serif;color:#fff;box-shadow:0 14px 44px rgba(0,0,0,.65);transition:all .5s cubic-bezier(.2,.8,.2,1)}
   #demo-cap.on{opacity:1;transform:translate(-50%,0)}
-  #demo-cap small{display:block;font:500 15px Inter,system-ui,sans-serif;color:#9ec9ff;margin-top:4px}
-  #demo-cap b{display:inline-block;min-width:30px;height:30px;line-height:30px;border-radius:50%;background:linear-gradient(135deg,#2f8fff,#26c3d7);color:#04121a;margin-right:10px;font-size:16px}
+  #demo-cap small{display:block;font:500 15px Inter,system-ui,sans-serif;color:#b3b3b3;margin-top:4px}
+  #demo-cap b{display:inline-block;min-width:30px;height:30px;line-height:30px;border-radius:50%;background:linear-gradient(135deg,#e50914,#b82869);color:#fff;margin-right:10px;font-size:16px}
   #demo-card{position:fixed;inset:0;z-index:2147483644;display:grid;place-items:center;text-align:center;opacity:0;pointer-events:none;transition:opacity .8s;
-    background:radial-gradient(900px 600px at 25% 15%,rgba(40,110,255,.38),transparent 60%),radial-gradient(800px 600px at 85% 95%,rgba(30,210,190,.28),transparent 60%),#040814}
+    background:radial-gradient(900px 600px at 25% 15%,rgba(229,9,20,.30),transparent 60%),radial-gradient(800px 600px at 85% 95%,rgba(64,97,231,.24),transparent 60%),#000}
   #demo-card.on{opacity:1}
   body:has(#demo-card.on) #demo-cursor{opacity:0}
-  #demo-card h1{font:800 76px Inter,system-ui,sans-serif;letter-spacing:-.035em;margin:0;background:linear-gradient(90deg,#fff,#9ccfff 50%,#26d7c4);-webkit-background-clip:text;background-clip:text;color:transparent}
-  #demo-card p{font:500 25px Inter,system-ui,sans-serif;color:#d6e6ff;margin:16px 0 0}
-  #demo-card .meta{font:500 16px 'JetBrains Mono',monospace;color:#8aa0c8;margin-top:30px;line-height:2}
+  #demo-card h1{font:800 76px Inter,system-ui,sans-serif;letter-spacing:-.035em;margin:0;background:linear-gradient(90deg,#fff,#ff6b72 50%,#e50914);-webkit-background-clip:text;background-clip:text;color:transparent}
+  #demo-card p{font:500 25px Inter,system-ui,sans-serif;color:#e6e6e6;margin:16px 0 0}
+  #demo-card .meta{font:500 16px 'JetBrains Mono',monospace;color:#b3b3b3;margin-top:30px;line-height:2}
   #demo-card .feat{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:28px;max-width:1100px}
-  #demo-card .feat span{font:600 15px Inter,system-ui,sans-serif;color:#cfe6ff;padding:8px 16px;border-radius:99px;border:1px solid rgba(62,166,255,.45);background:rgba(62,166,255,.1)}`;
+  #demo-card .feat span{font:600 15px Inter,system-ui,sans-serif;color:#fff;padding:8px 16px;border-radius:99px;border:1px solid rgba(229,9,20,.5);background:rgba(229,9,20,.12)}`;
   const add = () => {
     if (document.getElementById("demo-cursor")) return;
     const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
     const c = document.createElement("div"); c.id = "demo-cursor";
-    c.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 2.5l6.5 18 2.6-7.4 7.4-2.6z" fill="#fff" stroke="#0b1530" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+    c.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 2.5l6.5 18 2.6-7.4 7.4-2.6z" fill="#fff" stroke="#000" stroke-width="1.6" stroke-linejoin="round"/></svg>';
     c.style.transform = "translate(800px,450px)";
     const cap = document.createElement("div"); cap.id = "demo-cap";
     const card = document.createElement("div"); card.id = "demo-card";

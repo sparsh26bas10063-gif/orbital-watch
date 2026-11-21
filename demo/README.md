@@ -4,7 +4,7 @@ OrbitGuard | ASTRA 2026 | Team AstroNex
 
 [![OrbitGuard demo](orbitguard-demo-poster.png)](orbitguard-demo.mp4)
 
-**[orbitguard-demo.mp4](orbitguard-demo.mp4)**: 4 min 44 s, 1600×900, recorded from the live site
+**[orbitguard-demo.mp4](orbitguard-demo.mp4)**: 5 min 40 s, 1600×900, recorded from the live site
 (https://orbital-watch-z9bu.vercel.app). It walks through every feature:
 
 | # | Section | Example used |
@@ -18,7 +18,7 @@ OrbitGuard | ASTRA 2026 | Team AstroNex
 | 7 | Orbit changes and near-Earth asteroids | |
 | 8 | Custom 404 page | |
 
-The collision-screening wait (about 19 s while SGP4 runs on the server) is fast-forwarded 8×; everything else is real time.
+The collision-screening wait (about 20 s while SGP4 runs on the server) is fast-forwarded 8×; everything else is real time.
 
 This folder is excluded from the Vercel deployment (`.vercelignore`), and commits that only touch it don't trigger a
 rebuild of the website (`vercel.json` → `ignoreCommand`).
@@ -33,7 +33,7 @@ pip install --target .demo-lib websocket-client imageio-ffmpeg
 $env:PYTHONPATH = ".demo-lib"
 $env:DEMO_BASE = "https://orbital-watch-z9bu.vercel.app"   # or http://127.0.0.1:5000
 python demo/record_demo.py demo-work                         # ~5 minutes
-$env:SPEED = "101.8:120.5:8"                                  # optional: fast-forward a waiting span (seconds)
+$env:SPEED = "119:139.5:8"                                    # optional: fast-forward a waiting span (seconds)
 python demo/encode_demo.py demo-work demo/orbitguard-demo.mp4 demo/orbitguard-demo-poster.png 22
 ```
 
