@@ -1,3 +1,4 @@
+/* OrbitGuard | ASTRA 2026 | Team AstroNex */
 /* OrbitGuard app: routing, dashboard, satellite finder, collisions, space weather, planner, asteroids */
 "use strict";
 if (window.Chart) {

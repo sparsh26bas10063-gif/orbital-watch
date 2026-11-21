@@ -1,3 +1,4 @@
+/* OrbitGuard | ASTRA 2026 | Team AstroNex */
 /* OrbitGuard core: helpers, errors, toasts, alerts, background */
 "use strict";
 const $ = (s, r = document) => r.querySelector(s);

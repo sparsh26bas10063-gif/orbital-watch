@@ -1,4 +1,5 @@
-"""Orbital Watch - asteroid alerts, satellite disturbance detection and launch-orbit finder.
+# OrbitGuard | ASTRA 2026 | Team AstroNex
+"""OrbitGuard (formerly Orbital Watch) - asteroid alerts, satellite disturbance detection and launch-orbit finder.
 
 Examples:
     python main.py                      # interactive menu

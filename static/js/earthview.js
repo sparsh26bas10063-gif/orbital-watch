@@ -1,3 +1,4 @@
+/* OrbitGuard | ASTRA 2026 | Team AstroNex */
 /* OrbitGuard Earth View 3D: any place in 3D, as seen from orbit; ride along under a live satellite.
    Two engines:  "google" = Google Photorealistic 3D (needs GOOGLE_MAPS_API_KEY)
                  "open"   = MapLibre + Esri imagery + AWS terrain (free, no key) */

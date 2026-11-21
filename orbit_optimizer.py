@@ -1,3 +1,4 @@
+# OrbitGuard | ASTRA 2026 | Team AstroNex
 """Find a good orbit for a new satellite using the real catalog's crowding + basic astrodynamics.
 
 Heuristic trade study (educational), scoring each (altitude, inclination) candidate on:

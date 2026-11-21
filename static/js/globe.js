@@ -1,3 +1,4 @@
+/* OrbitGuard | ASTRA 2026 | Team AstroNex */
 /* OrbitGuard 3D globe: real satellites propagated in the browser (Kepler + J2 secular drift from TLE elements). */
 "use strict";
 const EARTH_TEX = "https://unpkg.com/three-globe@2.31.0/example/img/earth-blue-marble.jpg";

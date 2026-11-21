@@ -1,3 +1,4 @@
+/* OrbitGuard | ASTRA 2026 | Team AstroNex */
 /* OrbitGuard: Google Photorealistic 3D engine for Earth View (used only when a Google Maps API key is configured). */
 "use strict";
 const Google3D = (() => {

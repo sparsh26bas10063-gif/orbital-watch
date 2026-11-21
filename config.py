@@ -1,3 +1,4 @@
+# OrbitGuard | ASTRA 2026 | Team AstroNex
 """Shared settings and physical constants."""
 import os
 from pathlib import Path
