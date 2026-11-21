@@ -2,7 +2,7 @@
 /* OrbitGuard app: routing, dashboard, satellite finder, collisions, space weather, planner, asteroids */
 "use strict";
 if (window.Chart) {
-  Chart.defaults.color = "#8b98b6"; Chart.defaults.borderColor = "rgba(110,160,255,.1)";
+  Chart.defaults.color = "#b3b3b3"; Chart.defaults.borderColor = "rgba(128,128,128,.18)";
   Chart.defaults.font.family = '"Inter", system-ui, sans-serif';
 }
 const charts = {};
@@ -270,7 +270,7 @@ function renderTelemetry() {
 }
 function updateHeroLive(st) {
   $("#h-latlon").textContent = `${fmtLat(st.lat)}, ${fmtLon(st.lon)}`;
-  $("#h-sun").innerHTML = st.sunlit ? '<span style="color:var(--warn)">☀ Sunlit</span>' : '<span style="color:#9ec9ff">☾ Eclipse</span>';
+  $("#h-sun").innerHTML = st.sunlit ? '<span style="color:var(--warn)">☀ Sunlit</span>' : '<span style="color:#ffb3b8">☾ Eclipse</span>';
   $("#h-alt").textContent = fmt(st.alt, 1) + " km";
   $("#h-vel").textContent = fmt(st.v, 2) + " km/s";
   $("#h-per").textContent = fmt(st.period, 1) + " min";
@@ -280,8 +280,8 @@ function drawTrack() {
   const s = Globe?.selected, c = $("#track-map");
   if (!s || current !== "dashboard" || document.hidden) return;
   const x = c.getContext("2d"), W = c.width, H = c.height;
-  if (trackImg.complete && trackImg.naturalWidth) x.drawImage(trackImg, 0, 0, W, H); else { x.fillStyle = "#0a1838"; x.fillRect(0, 0, W, H); }
-  x.fillStyle = "rgba(4,8,20,.38)"; x.fillRect(0, 0, W, H);
+  if (trackImg.complete && trackImg.naturalWidth) x.drawImage(trackImg, 0, 0, W, H); else { x.fillStyle = "#0a0a0a"; x.fillRect(0, 0, W, H); }
+  x.fillStyle = "rgba(0,0,0,.42)"; x.fillRect(0, 0, W, H);
   const P = ([lat, lon]) => [(lon + 180) / 360 * W, (90 - lat) / 180 * H];
   const line = (pts, style, w) => {
     x.strokeStyle = style; x.lineWidth = w; x.beginPath(); let prev = null;
@@ -290,9 +290,9 @@ function drawTrack() {
   };
   const st = Globe.stateOf(s), per = Math.min(st.period, 1440);
   line(Globe.groundTrack(s, -per, 0, 140), "rgba(255,255,255,.4)", 1.4);
-  line(Globe.groundTrack(s, 0, per, 140), "#26d7c4", 2.2);
+  line(Globe.groundTrack(s, 0, per, 140), "#e50914", 2.2);
   const [px, py] = P([st.lat, st.lon]), r = 6 + 4 * Math.sin(performance.now() / 300);
-  x.fillStyle = "rgba(62,166,255,.25)"; x.beginPath(); x.arc(px, py, r + 4, 0, 7); x.fill();
+  x.fillStyle = "rgba(229,9,20,.3)"; x.beginPath(); x.arc(px, py, r + 4, 0, 7); x.fill();
   x.fillStyle = "#fff"; x.beginPath(); x.arc(px, py, 4, 0, 7); x.fill();
 }
 setInterval(drawTrack, 1000);
@@ -394,7 +394,7 @@ function gaugeSVG(kp) {
   }).join("");
   return `<svg viewBox="0 0 150 88">${seg}<g class="needle" style="transform:rotate(${Math.min(9, kp) / 9 * 180}deg)">
     <line x1="75" y1="75" x2="24" y2="75" stroke="#fff" stroke-width="3" stroke-linecap="round"/></g>
-    <circle cx="75" cy="75" r="6" fill="#fff"/><text x="12" y="88" fill="#5d6a8a" font-size="9">0</text><text x="133" y="88" fill="#5d6a8a" font-size="9">9</text></svg>`;
+    <circle cx="75" cy="75" r="6" fill="#fff"/><text x="12" y="88" fill="#808080" font-size="9">0</text><text x="133" y="88" fill="#808080" font-size="9">9</text></svg>`;
 }
 function renderGauge(d) {
   const g = $("#kp-gauge");
@@ -602,7 +602,7 @@ function renderAsteroids() {
     data: {datasets: [
       {label: "Not hazardous", data: pts(neows.filter(n => !n.hazardous)), backgroundColor: "rgba(62,166,255,.85)", pointRadius: 5, pointHoverRadius: 9},
       {label: "Potentially hazardous", data: pts(neows.filter(n => n.hazardous)), backgroundColor: "#ff5c72", pointRadius: 7, pointHoverRadius: 11},
-      {label: "Moon distance", type: "line", data: [{x: 1, y: 1}, {x: 1, y: 5000}], borderColor: "#8b98b6", borderDash: [6, 4], pointRadius: 0}]},
+      {label: "Moon distance", type: "line", data: [{x: 1, y: 1}, {x: 1, y: 5000}], borderColor: "#b3b3b3", borderDash: [6, 4], pointRadius: 0}]},
     options: {maintainAspectRatio: false, animation: {duration: REDUCED ? 0 : 1200, easing: "easeOutQuart", delay: c => c.type === "data" ? c.dataIndex * 30 : 0},
       scales: {x: {type: "logarithmic", min: .5, max: maxLd * 1.5, title: {display: true, text: "Miss distance (lunar distances)"}},
                y: {type: "logarithmic", title: {display: true, text: "Estimated diameter (m)"}}},
@@ -623,7 +623,7 @@ const Flyby = (() => {
   }
   function ring(r, dash, color, label) {
     x.setLineDash(dash); x.strokeStyle = color; x.lineWidth = 1; x.beginPath(); x.arc(W / 2, H / 2, r, 0, Math.PI * 2); x.stroke(); x.setLineDash([]);
-    if (label) { x.fillStyle = "rgba(139,152,182,.8)"; x.font = "10px JetBrains Mono, monospace"; x.fillText(label, W / 2 + r * .707 + 4, H / 2 - r * .707); }
+    if (label) { x.fillStyle = "rgba(179,179,179,.8)"; x.font = "10px JetBrains Mono, monospace"; x.fillText(label, W / 2 + r * .707 + 4, H / 2 - r * .707); }
   }
   let last = performance.now(), vis = false;
   new IntersectionObserver(e => vis = e[0].isIntersecting).observe(c);
@@ -633,7 +633,7 @@ const Flyby = (() => {
     if (!vis || !W) return;
     t += dt; x.clearRect(0, 0, W, H);
     const cx = W / 2, cy = H / 2;
-    for (const ld of [10, 50, 100, 200]) if (ld < maxLd) ring(scale(ld), [2, 6], "rgba(110,160,255,.14)", ld + " LD");
+    for (const ld of [10, 50, 100, 200]) if (ld < maxLd) ring(scale(ld), [2, 6], "rgba(128,128,128,.22)", ld + " LD");
     ring(scale(1), [5, 5], "rgba(200,210,255,.45)", "Moon");
     const ma = t * .25, mr = scale(1);
     x.fillStyle = "#cfd6e6"; x.beginPath(); x.arc(cx + Math.cos(ma) * mr, cy + Math.sin(ma) * mr, 3.2, 0, 7); x.fill();
@@ -641,7 +641,7 @@ const Flyby = (() => {
     gr.addColorStop(0, "#9fd3ff"); gr.addColorStop(.35, "#2f7bff"); gr.addColorStop(.6, "rgba(47,123,255,.25)"); gr.addColorStop(1, "rgba(47,123,255,0)");
     x.fillStyle = gr; x.beginPath(); x.arc(cx, cy, 26, 0, 7); x.fill();
     x.fillStyle = "#1f5fd6"; x.beginPath(); x.arc(cx, cy, 9, 0, 7); x.fill();
-    if (!objs.length) { x.fillStyle = "#8b98b6"; x.font = "13px Inter, sans-serif"; x.textAlign = "center"; x.fillText("Loading NASA asteroid data…", cx, cy + 50); x.textAlign = "left"; return; }
+    if (!objs.length) { x.fillStyle = "#b3b3b3"; x.font = "13px Inter, sans-serif"; x.textAlign = "center"; x.fillText("Loading NASA asteroid data…", cx, cy + 50); x.textAlign = "left"; return; }
     const L = R() * 1.6;
     for (const o of objs) {
       const s = ((t * o.spd + o.phase) % 1) * 2 - 1, r = scale(o.miss_ld), nx = Math.cos(o.ang), ny = Math.sin(o.ang);

@@ -73,7 +73,7 @@ const EarthView = (() => {
                   tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"]},
           },
           layers: [
-            {id: "bg", type: "background", paint: {"background-color": "#071029"}},
+            {id: "bg", type: "background", paint: {"background-color": "#0a0a0a"}},
             {id: "hires", type: "raster", source: "hires"},
             {id: "today", type: "raster", source: "today", layout: {visibility: "none"}},
             {id: "labels", type: "raster", source: "labels", paint: {"raster-opacity": .85}},

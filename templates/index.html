@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>OrbitGuard · Space Safety Console</title>
 <meta name="description" content="Know what's at risk in orbit today, and where it's safe to launch tomorrow. Live satellites, close-approach alerts, NASA space-weather drag warnings and a best-orbit recommender.">
-<meta name="theme-color" content="#040814">
+<meta name="theme-color" content="#000000">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='8' fill='%233ea6ff'/%3E%3Cellipse cx='20' cy='20' rx='17' ry='7' fill='none' stroke='%2326d7c4' stroke-width='2.5' transform='rotate(-30 20 20)'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -82,7 +82,7 @@
   <aside class="sidebar" id="sidebar" aria-label="Main navigation">
     <a class="brand" href="/" aria-label="OrbitGuard home">
       <svg viewBox="0 0 40 40" aria-hidden="true">
-        <defs><linearGradient id="lg" x1="0" x2="1"><stop offset="0" stop-color="#3ea6ff"/><stop offset="1" stop-color="#26d7c4"/></linearGradient></defs>
+        <defs><linearGradient id="lg" x1="0" x2="1"><stop offset="0" stop-color="#e50914"/><stop offset="1" stop-color="#b82869"/></linearGradient></defs>
         <circle cx="20" cy="20" r="8.5" fill="url(#lg)"/>
         <g class="ring"><ellipse cx="20" cy="20" rx="17" ry="7" fill="none" stroke="url(#lg)" stroke-width="2" transform="rotate(-30 20 20)"/>
           <circle cx="34.5" cy="11.5" r="2.4" fill="#fff"/></g>
@@ -149,7 +149,7 @@
                   <div class="row"><span>Period</span><b id="h-per">-</b></div></div>
                 <div class="mini map"><h5><svg class="ic"><use href="#i-map"/></svg>Ground track</h5>
                   <canvas id="track-map" width="440" height="220"></canvas>
-                  <div class="legend"><span><i style="background:#26d7c4"></i>Next orbit</span><span><i style="background:rgba(255,255,255,.4)"></i>Last orbit</span></div></div>
+                  <div class="legend"><span><i style="background:#e50914"></i>Next orbit</span><span><i style="background:rgba(255,255,255,.4)"></i>Last orbit</span></div></div>
                 <div class="btns"><button class="btn ghost sm" id="h-more"><svg class="ic"><use href="#i-info"/></svg>Full profile</button>
                   <button class="btn ghost sm" id="h-ride"><svg class="ic"><use href="#i-eye"/></svg>View below</button></div>
               </div>
