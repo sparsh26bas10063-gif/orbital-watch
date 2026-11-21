@@ -222,10 +222,17 @@ def api_catalog():
 @app.route("/api/disturbances")
 @api
 def api_disturbances():
+    current = get_catalog()             # a real catalog failure should still surface as an error
     if ON_VERCEL:
-        # serverless: no persistent disk, so compare with the older copy kept by the GitHub Action
-        return satellites.detect_disturbances(get_catalog(), previous_sats=get_catalog("previous"))
-    return satellites.detect_disturbances(get_catalog())
+        # serverless: no persistent disk, so compare with the older copy kept by the GitHub Action.
+        # Right after the repo/mirror is created there is no "previous" copy yet: don't fail, just run
+        # without a baseline (re-entry risks still work) and let the UI show its "first run" note.
+        try:
+            previous = get_catalog("previous")
+        except ApiError:
+            previous = []
+        return satellites.detect_disturbances(current, previous_sats=previous)
+    return satellites.detect_disturbances(current)
 
 
 @app.route("/api/conjunctions")
