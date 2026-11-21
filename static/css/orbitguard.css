@@ -456,7 +456,14 @@ tr.top td { background: rgba(47, 211, 154, .08); }
 .ride-badge { position: absolute; top: 64px; left: 50%; transform: translateX(-50%); z-index: 3; padding: 6px 14px; border-radius: 99px; background: rgba(62, 166, 255, .9);
               color: #fff; font-weight: 600; font-size: 12.5px; box-shadow: 0 8px 26px -8px rgba(62, 166, 255, 1); display: flex; gap: 8px; align-items: center; white-space: nowrap; max-width: calc(100% - 24px); overflow: hidden; text-overflow: ellipsis; }
 .ride-badge[hidden] { display: none; }
-.ride-badge button { border: 0; background: rgba(255, 255, 255, .25); color: #fff; border-radius: 99px; padding: 1px 8px; cursor: pointer; }
+.ride-text { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ride-badge { z-index: 8; pointer-events: auto; }
+.ride-badge > .ic { flex: none; }
+.ride-badge .ride-stop { position: relative; z-index: 1; }
+.ride-badge .ride-stop { flex: none; display: inline-flex; align-items: center; gap: 4px; border: 0; background: rgba(255, 255, 255, .25); color: #fff;
+  border-radius: 99px; padding: 3px 10px; cursor: pointer; font: 600 12px var(--sans); transition: background .2s, transform .2s var(--ease); }
+.ride-badge .ride-stop:hover { background: #ff5c72; transform: scale(1.06); }
+.ride-badge .ride-stop .ic { width: 13px; height: 13px; }
 .pin { width: 18px; height: 18px; border-radius: 50%; background: var(--accent); border: 3px solid #fff; box-shadow: 0 0 0 0 rgba(62, 166, 255, .7); animation: pinp 1.8s infinite; }
 .pin.sat { background: #fff; border-color: var(--accent-2); width: 14px; height: 14px; }
 @keyframes pinp { 70% { box-shadow: 0 0 0 16px rgba(62, 166, 255, 0); } 100% { box-shadow: 0 0 0 0 rgba(62, 166, 255, 0); } }
@@ -551,3 +558,21 @@ a.btn, a.btn:hover { text-decoration: none; }
 #gmap { position: absolute; inset: 0; z-index: 1; background: #071029; }
 #gmap[hidden], .chip[hidden] { display: none; }
 .toast code { font: 11.5px var(--mono); background: rgba(255,255,255,.08); padding: 1px 5px; border-radius: 5px; }
+
+/* own-orbit (optional) */
+.own-orbit { flex: 1 1 100%; padding: 14px 16px; border-radius: var(--r-md); border: 1px dashed var(--line-2); background: rgba(62, 166, 255, .04);
+             transition: border-color .25s, background .25s; }
+.own-orbit:hover, .own-orbit.active { border-color: rgba(62, 166, 255, .55); background: rgba(62, 166, 255, .07); }
+.own-orbit.active { border-style: solid; }
+.own-h { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.own-h .ic { color: var(--accent); } .own-h .link-btn { margin-left: auto; }
+.own-orbit .note { margin: 0 0 10px; }
+.own-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 10px; }
+form.controls .own-grid label { max-width: none; }
+.own-presets { margin-top: 6px; align-items: center; }
+.own-presets .chip { font-size: 11px; padding: 4px 9px; }
+.cmp { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 12px 14px; border-radius: var(--r-md); margin: -4px 0 16px;
+       background: rgba(255, 255, 255, .03); border: 1px solid var(--line); font-size: 13px; }
+.cmp .rank { font: 700 20px var(--sans); letter-spacing: -.02em; }
+.cmp .btn { margin-left: auto; }
+@media (max-width: 520px) { .own-grid { grid-template-columns: minmax(0, 1fr); } .cmp .btn { margin-left: 0; } }

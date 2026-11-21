@@ -666,45 +666,107 @@ const Flyby = (() => {
    Best-orbit planner
    ===================================================================== */
 $("#opt-form").onsubmit = e => { e.preventDefault(); loadOpt(); };
+
+/* optional "your own orbit" inputs */
+const ssoInc = altKm => {                    // sun-synchronous inclination (deg) or null if impossible
+  const a = RE_KM + altKm, n = Math.sqrt(398600.4418 / a ** 3);
+  const c = -(2 * Math.PI / (365.2422 * 86400)) / (1.5 * n * 1.08262668e-3 * (RE_KM / a) ** 2);
+  return Math.abs(c) <= 1 ? Math.acos(c) * 180 / Math.PI : null;
+};
+function syncOwnOrbit() {
+  const active = !!($("#o-alt").value.trim() || $("#o-inc").value.trim());
+  $("#own-orbit").classList.toggle("active", active);
+  $("#own-clear").hidden = !active;
+  $$("#own-orbit [data-alt]").forEach(c => c.classList.toggle("on", c.dataset.alt === $("#o-alt").value.trim()));
+  $$("#own-orbit [data-inc]").forEach(c => c.classList.toggle("on", c.dataset.inc === $("#o-inc").value.trim()));
+}
+$("#o-alt").addEventListener("input", syncOwnOrbit);
+$("#o-inc").addEventListener("input", syncOwnOrbit);
+$$("#own-orbit [data-alt]").forEach(c => c.onclick = () => { $("#o-alt").value = c.dataset.alt; syncOwnOrbit(); });
+$$("#own-orbit [data-inc]").forEach(c => c.onclick = () => {
+  if (c.dataset.inc !== "sso") { $("#o-inc").value = c.dataset.inc; syncOwnOrbit(); return; }
+  const alt = +$("#o-alt").value;
+  if (!alt) {
+    $("#o-inc").value = ""; $("#o-mission").value = "earth-observation";
+    toast("Sun-synchronous inclination is picked automatically for Earth-observation missions. Set an altitude to see the exact angle.", "info", 5000);
+  } else {
+    const i = ssoInc(alt);
+    if (i == null) { toast(`Sun-synchronous orbits are impossible at ${fmt(alt)} km (only below ~5,970 km).`, "warn", 5000); return; }
+    $("#o-inc").value = i.toFixed(2);
+  }
+  syncOwnOrbit();
+});
+$("#own-clear").onclick = () => { $("#o-alt").value = ""; $("#o-inc").value = ""; syncOwnOrbit(); };
+
 async function loadOpt() {
   const btn = $("#opt-btn"), out = $("#opt-out");
   const lat = $("#o-lat").value.trim(), years = +$("#o-years").value;
-  if (lat && !(Math.abs(+lat) <= 90)) { showError(out, new AppError("Latitude must be between -90 and 90 degrees.", {code: "OUT_OF_RANGE"})); return; }
-  if (!(years >= 1 && years <= 30)) { showError(out, new AppError("Mission life must be between 1 and 30 years.", {code: "OUT_OF_RANGE"})); return; }
+  const altS = $("#o-alt").value.trim(), incS = $("#o-inc").value.trim();
+  const bad = (msg, hint) => { showError(out, new AppError(msg, {code: "OUT_OF_RANGE", hint})); return true; };
+  if (lat && !(Math.abs(+lat) <= 90) && bad("Latitude must be between -90 and 90 degrees.")) return;
+  if (!(years >= 1 && years <= 30) && bad("Mission life must be between 1 and 30 years.")) return;
+  if (altS && !(+altS >= 160 && +altS <= 40000) &&
+      bad("Altitude must be between 160 and 40,000 km.", "Below ~160 km a satellite re-enters within hours; GEO is 35,786 km.")) return;
+  if (incS && !(+incS >= 0 && +incS <= 180) &&
+      bad("Inclination must be between 0° and 180°.", "0° = over the equator, 90° = over the poles, above 90° = retrograde.")) return;
+  const own = !!(altS || incS);
   busy(btn, true, "Scoring…"); setStep("plan", "run", "scoring");
-  out.innerHTML = '<div class="loading">Scoring candidate orbits against the real catalog…</div>';
+  out.innerHTML = `<div class="loading">${own ? "Scoring your orbit against" : "Scoring candidate orbits against"} the real catalog…</div>`;
   try {
     const q = new URLSearchParams({mission: $("#o-mission").value, site: $("#o-site").value, years});
     if (lat) q.set("lat", lat);
+    if (altS) q.set("alt", altS);
+    if (incS) q.set("inc", incS);
     const r = await getJSON("/api/optimize?" + q, {timeout: 90000});
     const b = r.best[0];
-    if (!b) throw new AppError("No orbit fits these constraints.", {code: "BAD_INPUT", hint: "Try a longer mission life or another launch site."});
-    const sc = b.scores;
-    let html = `<div class="reco"><div><h4>${icon("check")} Recommended orbit</h4>
-        <div class="orbit">${b.alt_km} km · ${fmt(b.inc_deg, 1)}°${r.mission === "earth-observation" ? " sun-synchronous" : ""}</div>
-        <p class="muted" style="margin:4px 0 0">Period ${fmt(b.period_min, 1)} min · lifetime ≈ ${fmt(b.lifetime_yr, 1)} yr · launch Δv ≈ ${fmt(b.dv_kms, 2)} km/s · score <b style="color:var(--text)">${fmt(b.score, 1)}</b></p>
+    if (!b) throw new AppError("No orbit fits these constraints.", {code: "BAD_INPUT", hint: "Try a longer mission life, another launch site, or clear your own altitude/inclination."});
+    const sc = b.scores, cu = r.custom;
+    const sso = ssoInc(b.alt_km), isSso = sso != null && Math.abs(b.inc_deg - sso) < .5;
+    const title = !cu ? "Recommended orbit" : altS && incS ? "Your orbit" : altS ? `Best inclination at ${fmt(+altS)} km` : `Best altitude at ${fmt(+incS, 1)}°`;
+    const life = y => y >= 1000 ? "permanent" : y < 1 ? fmtLife(y * 365.25) : fmt(y, 1) + " yr";
+    let html = "";
+    if (cu) {
+      const o = cu.overall_best, gap = o.score - b.score;
+      const verdict = cu.rank === 1 ? ["good", "Top choice"] : gap <= 3 ? ["good", "Close to the best"] : gap <= 10 ? ["warn", "Good, but better exists"] : ["bad", "Much better orbits exist"];
+      html += `<div class="cmp"><div><div class="rank">#${fmt(cu.rank)} <span class="muted" style="font-size:13px;font-weight:500">of ${fmt(cu.of)} orbits</span></div>
+          <span class="tag ${verdict[0]}">${verdict[1]}</span></div>
+        <div class="muted">Best overall: <b style="color:var(--text)">${fmt(o.alt_km)} km · ${fmt(o.inc_deg, 1)}°</b> (score ${fmt(o.score, 1)})<br>Your pick scores <b style="color:var(--text)">${fmt(b.score, 1)}</b>${gap > 0 ? `, ${fmt(gap, 1)} lower` : ""}</div>
+        ${cu.rank > 1 ? `<button class="btn ghost sm" type="button" id="use-best">${icon("check")}Use best instead</button>` : ""}</div>` +
+        (cu.note ? `<div class="err soft" style="animation:none;margin-bottom:14px"><div class="err-ic">${icon("info")}</div><div><b>Heads-up</b><p>${esc(cu.note)}</p></div></div>` : "");
+    }
+    html += `<div class="reco"><div><h4>${icon("check")} ${esc(title)}</h4>
+        <div class="orbit">${fmt(b.alt_km)} km · ${fmt(b.inc_deg, 1)}°${isSso ? " sun-synchronous" : b.alt_km > 30000 && b.inc_deg < 5 ? " geostationary" : ""}</div>
+        <p class="muted" style="margin:4px 0 0">Period ${b.period_min > 600 ? fmt(b.period_min / 60, 1) + " h" : fmt(b.period_min, 1) + " min"} · lifetime ≈ ${life(b.lifetime_yr)} · launch Δv ≈ ${fmt(b.dv_kms, 2)} km/s · score <b style="color:var(--text)">${fmt(b.score, 1)}</b></p>
         <ul>${b.why.map(w => `<li>${icon("check")}<span>${esc(w)}</span></li>`).join("")}</ul></div>
       <div class="bars">${[["Safety", sc.safety], ["Lifetime", sc.lifetime], ["Coverage", sc.coverage], ["Launch cost", sc.launch_cost]]
         .map(([n, v]) => `<div class="bar"><span>${n}</span><div class="tr"><i data-w="${v.toFixed(0)}"></i></div><b>${fmt(v)}</b></div>`).join("")}</div></div>`;
-    html += table([
-      {h: "#", f: (x, i) => i + 1}, {h: "Altitude", num: 1, f: x => x.alt_km + " km"}, {h: "Inclination", num: 1, f: x => fmt(x.inc_deg, 1) + "°"},
-      {h: "Safety", num: 1, f: x => fmt(x.scores.safety)}, {h: "Lifetime", num: 1, f: x => fmt(x.lifetime_yr, 1) + " yr"},
-      {h: "Coverage", num: 1, f: x => "±" + fmt(x.coverage_lat_deg) + "°"}, {h: "Δv", num: 1, f: x => fmt(x.dv_kms, 2) + " km/s"},
-      {h: "Score", num: 1, f: x => `<b>${fmt(x.score, 1)}</b>`}], r.best, {top: true});
-    if (r.geo) html += `<p class="note mt">Alternative: GEO at ${fmt(r.geo.alt_km)} km, 0°, Δv ≈ ${fmt(r.geo.dv_kms, 2)} km/s. Much more expensive, but 3 satellites cover most of the globe.</p>`;
+    if (r.best.length > 1 || !cu) {
+      if (cu) html += `<p class="note">${altS ? "Other inclinations at this altitude:" : "Other altitudes at this inclination:"}</p>`;
+      html += table([
+        {h: "#", f: (x, i) => i + 1}, {h: "Altitude", num: 1, f: x => fmt(x.alt_km) + " km"}, {h: "Inclination", num: 1, f: x => fmt(x.inc_deg, 1) + "°"},
+        {h: "Safety", num: 1, f: x => fmt(x.scores.safety)}, {h: "Lifetime", num: 1, f: x => life(x.lifetime_yr)},
+        {h: "Coverage", num: 1, f: x => "±" + fmt(x.coverage_lat_deg) + "°"}, {h: "Δv", num: 1, f: x => fmt(x.dv_kms, 2) + " km/s"},
+        {h: "Score", num: 1, f: x => `<b>${fmt(x.score, 1)}</b>`}], r.best, {top: true});
+    }
+    if (r.geo && !(cu && b.alt_km > 30000)) html += `<p class="note mt">Alternative: GEO at ${fmt(r.geo.alt_km)} km, 0°, Δv ≈ ${fmt(r.geo.dv_kms, 2)} km/s. Much more expensive, but 3 satellites cover most of the globe.</p>`;
     out.innerHTML = html;
+    $("#use-best")?.addEventListener("click", () => { $("#o-alt").value = ""; $("#o-inc").value = ""; syncOwnOrbit(); loadOpt(); });
     requestAnimationFrame(() => $$(".bar i", out).forEach(i => i.style.width = i.dataset.w + "%"));
-    Globe?.showPlanned(b.alt_km, b.inc_deg, r.mission);
-    setStep("plan", "done", `${b.alt_km} km`);
-    Alerts.add({id: "plan", level: "good", icon: "rocket", time: new Date().toISOString(), title: `Best orbit: ${b.alt_km} km at ${fmt(b.inc_deg, 1)}°`,
-                text: `${esc($("#o-mission").selectedOptions[0].text)} mission, score ${fmt(b.score, 1)}.`, go: () => go("planner")});
+    Globe?.showPlanned(b.alt_km, b.inc_deg, isSso ? "earth-observation" : r.mission);
+    setStep("plan", "done", `${fmt(b.alt_km)} km`);
+    Alerts.add({id: "plan", level: "good", icon: "rocket", time: new Date().toISOString(), title: `${cu ? "Your orbit" : "Best orbit"}: ${fmt(b.alt_km)} km at ${fmt(b.inc_deg, 1)}°`,
+                text: `${esc($("#o-mission").selectedOptions[0].text)} mission, score ${fmt(b.score, 1)}${cu ? `, rank #${cu.rank}` : ""}.`, go: () => go("planner")});
     $("#opt-chart-card").hidden = false;
+    $("#opt-chart-card .note").innerHTML = "Tracked objects per 10⁹ km³ (active satellites + major debris clouds). Green = " +
+      (cu ? "your orbit" : "recommended") + ", amber = runners-up." +
+      (b.alt_km > 2000 ? ` <b>Your altitude (${fmt(b.alt_km)} km) is above this chart's 2,000 km range, where tracked objects are far sparser.</b>` : "");
     if (!window.Chart) return;
     charts.opt?.destroy();
+    const keep = r.density.alt.map((a, i) => [a, r.density.per_1e9_km3[i]]).filter(([a]) => a <= 2000);
     const best = r.best.map(x => x.alt_km);
     charts.opt = new Chart($("#opt-chart"), {type: "bar",
-      data: {labels: r.density.alt.map(a => Math.round(a)), datasets: [{label: "Objects per 10⁹ km³", data: r.density.per_1e9_km3, borderRadius: 3,
-        backgroundColor: r.density.alt.map(a => Math.abs(b.alt_km - a) <= 12.5 ? "#2fd39a" : best.some(x => Math.abs(x - a) <= 12.5) ? "#f7b84b" : "rgba(62,166,255,.7)")}]},
+      data: {labels: keep.map(([a]) => Math.round(a)), datasets: [{label: "Objects per 10⁹ km³", data: keep.map(([, v]) => v), borderRadius: 3,
+        backgroundColor: keep.map(([a]) => Math.abs(b.alt_km - a) <= 12.5 ? "#2fd39a" : best.some(x => Math.abs(x - a) <= 12.5) ? "#f7b84b" : "rgba(62,166,255,.7)")}]},
       options: {maintainAspectRatio: false, plugins: {legend: {display: false}},
         animation: {duration: REDUCED ? 0 : 1000, easing: "easeOutQuart", delay: c => c.type === "data" ? c.dataIndex * 10 : 0},
         scales: {y: {type: "logarithmic", title: {display: true, text: "Objects per 10⁹ km³"}}, x: {title: {display: true, text: "Altitude (km)"}, ticks: {maxTicksLimit: 14}}}}});

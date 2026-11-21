@@ -108,40 +108,63 @@ def _norm(x: np.ndarray) -> np.ndarray:
     return np.zeros_like(x) if span == 0 else (x - x.min()) / span
 
 
+def _grid_incs(mission: str, alt: float, inc_range=(0, 100)) -> list[float]:
+    """Inclinations worth trying at an altitude (sun-synchronous only for Earth observation)."""
+    if mission == "earth-observation":
+        sso = sun_sync_inclination(alt)
+        if sso:
+            return [round(sso, 2)] if inc_range[0] <= sso <= inc_range[1] else []
+    return [i for i in range(max(int(inc_range[0]), 0), int(inc_range[1]) + 1, 5)]
+
+
 def optimize(catalog, mission: str = "earth-observation", site_lat: float = 13.72,
-             alt_range=(300, 1500), inc_range=(0, 100), mission_years: float = 5, top: int = 5):
+             alt_range=(300, 1500), inc_range=(0, 100), mission_years: float = 5, top: int = 5,
+             custom_alt: float | None = None, custom_inc: float | None = None, details: dict | None = None):
+    """Score candidate orbits and return the best few.
+
+    custom_alt / custom_inc (both optional) let the user place the satellite in their own orbit:
+      * altitude only     -> best inclination at that altitude
+      * inclination only  -> best altitude for that inclination
+      * both              -> exactly that orbit
+    User orbits are scored together with the default grid so the numbers are comparable, and
+    `details` (if given) is filled with the overall best orbit and the user's rank.
+    """
     cfg = MISSIONS[mission]
-    edges, dens, counts, inc_hist = density_profile(catalog)
+    grid_alts = list(range(int(alt_range[0]), int(alt_range[1]) + 1, 25))
+    cands = [(a, i, False) for a in grid_alts for i in _grid_incs(mission, a, inc_range)]
+    if custom_alt is not None or custom_inc is not None:
+        alts = [custom_alt] if custom_alt is not None else grid_alts
+        for a in alts:
+            for i in ([custom_inc] if custom_inc is not None else _grid_incs(mission, a)):
+                cands.append((float(a), float(i), True))
+    max_alt = int(max(2000, max(a for a, _, _ in cands) + 100))
+    edges, dens, counts, inc_hist = density_profile(catalog, max_alt=max_alt)
     centers = (edges[:-1] + edges[1:]) / 2
 
     rows = []
-    for alt in range(int(alt_range[0]), int(alt_range[1]) + 1, 25):
-        if mission == "earth-observation":
-            sso = sun_sync_inclination(alt)
-            incs = [round(sso, 2)] if sso else []
-        else:
-            incs = list(range(max(int(inc_range[0]), 0), int(inc_range[1]) + 1, 5))
+    for alt, inc, custom in cands:
         k = min(len(dens) - 1, max(0, np.searchsorted(edges, alt) - 1))
-        for inc in incs:
-            if not (inc_range[0] <= inc <= inc_range[1]):
-                continue
-            life = lifetime_years(alt)
-            # same-inclination crowding (objects that share your orbital plane family)
-            same_inc = inc_hist[k, min(17, int(inc // 10))] / max(counts[k], 1)
-            band = cfg["band"]
-            if mission == "earth-observation":
-                fit = 1.0 if band[0] <= alt <= band[1] else 0.3
-                fit *= 1 - (alt - band[0]) / 2000           # lower = sharper images
-            elif mission == "communications":
-                footprint = math.degrees(math.acos(EARTH_RADIUS_KM / (EARTH_RADIUS_KM + alt)))
-                fit = footprint / 40 + (0.3 if inc >= 50 else 0)  # wider footprint, global coverage
-            else:
-                fit = 1.0 if band[0] <= alt <= band[1] else 0.5
-            rows.append({
-                "alt_km": alt, "inc_deg": inc, "period_min": period_min(alt),
-                "density": dens[k] * (0.7 + 0.6 * same_inc), "objects_in_shell": counts[k],
-                "dv_kms": launch_dv(alt, inc, site_lat), "lifetime_yr": life, "fit": fit,
-            })
+        life = lifetime_years(alt)
+        # same-inclination crowding (objects that share your orbital plane family)
+        same_inc = inc_hist[k, min(17, int(min(inc, 179.9) // 10))] / max(counts[k], 1)
+        band = cfg["band"]
+        if mission == "earth-observation":
+            fit = 1.0 if band[0] <= alt <= band[1] else 0.3
+            fit *= max(0.05, 1 - (alt - band[0]) / 2000)    # lower = sharper images
+            sso = sun_sync_inclination(alt)
+            if not sso or abs(inc - sso) > 0.5:
+                fit *= 0.6                                    # not sun-synchronous: lighting varies
+        elif mission == "communications":
+            footprint = math.degrees(math.acos(EARTH_RADIUS_KM / (EARTH_RADIUS_KM + alt)))
+            fit = footprint / 40 + (0.3 if 50 <= inc <= 130 else 0)  # wider footprint, global coverage
+        else:
+            fit = 1.0 if band[0] <= alt <= band[1] else 0.5
+        rows.append({
+            "alt_km": alt, "inc_deg": inc, "period_min": period_min(alt), "custom": custom,
+            "density": dens[k] * (0.7 + 0.6 * same_inc), "objects_in_shell": counts[k],
+            "dv_kms": launch_dv(alt, inc, site_lat),
+            "lifetime_yr": life, "fit": fit,
+        })
     if not rows:
         return [], (centers, dens)
 
@@ -169,14 +192,29 @@ def optimize(catalog, mission: str = "earth-observation", site_lat: float = 13.7
         r["why"] = _explain(r, mission, mission_years)
     rows.sort(key=lambda r: r["score"], reverse=True)
 
-    # keep diverse results: skip near-duplicates of an already chosen orbit
-    chosen = []
-    for r in rows:
-        if all(abs(r["alt_km"] - c["alt_km"]) >= 50 or abs(r["inc_deg"] - c["inc_deg"]) >= 10 for c in chosen):
-            chosen.append(r)
-        if len(chosen) == top:
-            break
-    return chosen, (centers, dens)
+    def diverse(pool):
+        """Keep distinct results: skip near-duplicates of an orbit already chosen."""
+        chosen = []
+        for r in pool:
+            if all(abs(r["alt_km"] - c["alt_km"]) >= 50 or abs(r["inc_deg"] - c["inc_deg"]) >= 10 for c in chosen):
+                chosen.append(r)
+            if len(chosen) == top:
+                break
+        return chosen
+
+    user = [r for r in rows if r["custom"]]
+    if details is not None:
+        details["overall_best"] = rows[0]
+        details["candidates"] = len(rows)
+        if user:
+            details["user_rank"] = 1 + sum(r["score"] > user[0]["score"] for r in rows)   # ties share a rank
+    if user:
+        # small steps are fine when the user fixed one value (e.g. best inclination at 550 km)
+        pool = user
+        chosen = [pool[0]] + [r for r in pool[1:] if abs(r["alt_km"] - pool[0]["alt_km"]) >= 25
+                              or abs(r["inc_deg"] - pool[0]["inc_deg"]) >= 5][:top - 1]
+        return chosen, (centers, dens)
+    return diverse(rows), (centers, dens)
 
 
 def _explain(r: dict, mission: str, mission_years: float) -> list[str]:
@@ -185,18 +223,30 @@ def _explain(r: dict, mission: str, mission_years: float) -> list[str]:
     why.append("Quiet shell: few tracked objects nearby" if s["safety"] >= 66 else
                "Moderately busy shell" if s["safety"] >= 33 else "Crowded shell: higher collision risk")
     life = r["lifetime_yr"]
-    if life < mission_years:
-        why.append(f"Decays in ~{life:.1f} yr, before the {mission_years:g}-year mission ends")
+    if r["alt_km"] > 2000:
+        why.append("Stays up practically forever: plan a graveyard / disposal burn at end of life")
+    elif life < mission_years:
+        days = max(1, round(life * 365))
+        span = (f"{days} day" + ("s" if days != 1 else "")) if life < 1 else f"{life:.1f} yr"
+        why.append(f"Decays in ~{span}, before the {mission_years:g}-year mission ends")
     elif life <= mission_years + 5:
         why.append(f"Re-enters naturally in ~{life:.0f} yr: meets the 5-year deorbit rule, no debris left behind")
     else:
         why.append(f"Stays up ~{life:.0f} yr: needs a deorbit system to avoid becoming debris")
     lat = r["coverage_lat_deg"]
-    if mission == "earth-observation":
+    sso = sun_sync_inclination(r["alt_km"])
+    if mission == "earth-observation" and sso and abs(r["inc_deg"] - sso) <= 0.5:
         why.append(f"Sun-synchronous: same lighting every pass, covers up to {lat:.0f}° latitude")
+    elif r["alt_km"] > 30000 and r["inc_deg"] < 5:
+        why.append("Geostationary-style: hovers over one longitude and sees ~42% of Earth, but not the poles")
+    elif mission == "earth-observation":
+        why.append(f"Not sun-synchronous{f' (SSO here is {sso:.1f}°)' if sso else ''}: lighting changes between passes")
+        why.append(f"Covers latitudes up to ±{lat:.0f}°")
     else:
         why.append(f"Covers latitudes up to ±{lat:.0f}°, footprint radius ~{r['footprint_km']:.0f} km")
     why.append("Cheap to reach from this launch site" if s["launch_cost"] >= 60 else "Needs extra launch energy")
+    if 2000 < r["alt_km"] < 30000:
+        why.append("Inside the Van Allen radiation belts region: needs radiation-hardened electronics")
     return why
 
 

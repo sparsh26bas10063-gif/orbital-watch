@@ -418,7 +418,7 @@ const Globe = (() => {
     const s = prep([-1, "Your satellite", n, 0, incDeg * D2R, raan, 0, 0, simJD, "sat"]);
     groups.planned = [{s, color: [.18, .95, .6], size: .075, label: `Your satellite · ${altKm} km · ${incDeg.toFixed(1)}°`, orbit: true, cls: "planned"}];
     rebuildSpecials();
-    setFollow(false); flyCam(() => camera.position.clone().setLength(3.8));
+    setFollow(false); flyCam(() => camera.position.clone().setLength(Math.min(21, Math.max(3.8, (1 + altKm / RE) * 2.8))));   // GEO needs a wider view
   }
   function clear(group) { delete groups[group]; rebuildSpecials(); }
   function mount(slot) { if (slot && wrapEl.parentElement !== slot) { slot.appendChild(wrapEl); requestAnimationFrame(resize); } }

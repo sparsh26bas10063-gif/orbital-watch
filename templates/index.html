@@ -361,12 +361,36 @@
               <label>Launch site<select id="o-site">{% for s, lat in sites.items() %}<option value="{{ s }}">{{ s.title() }} ({{ lat }}°)</option>{% endfor %}</select></label>
               <label>Custom latitude<input id="o-lat" type="number" step="0.01" min="-90" max="90" placeholder="optional"></label>
               <label>Mission life (years)<input id="o-years" type="number" value="5" min="1" max="30"></label>
+              <div class="own-orbit" id="own-orbit">
+                <div class="own-h"><svg class="ic"><use href="#i-orbit"/></svg><b>Your own orbit</b><span class="tag mute">OPTIONAL</span>
+                  <button type="button" class="link-btn" id="own-clear" hidden><svg class="ic"><use href="#i-x"/></svg>Clear</button></div>
+                <p class="note">Leave empty to let OrbitGuard pick. Set an altitude, an inclination, or both to place the satellite exactly where you want and see how it scores.</p>
+                <div class="own-grid">
+                  <label>Altitude (km)<input id="o-alt" type="number" min="160" max="40000" step="1" placeholder="auto (e.g. 550)" inputmode="decimal"></label>
+                  <label>Inclination (°)<input id="o-inc" type="number" min="0" max="180" step="0.1" placeholder="auto (e.g. 97.6)" inputmode="decimal"></label>
+                </div>
+                <div class="chips own-presets">
+                  <span class="muted" style="font-size:11.5px">Altitude:</span>
+                  <button type="button" class="chip" data-alt="420">ISS 420 km</button>
+                  <button type="button" class="chip" data-alt="550">Starlink 550 km</button>
+                  <button type="button" class="chip" data-alt="800">800 km</button>
+                  <button type="button" class="chip" data-alt="20200">GPS 20,200 km</button>
+                  <button type="button" class="chip" data-alt="35786">GEO 35,786 km</button>
+                </div>
+                <div class="chips own-presets">
+                  <span class="muted" style="font-size:11.5px">Inclination:</span>
+                  <button type="button" class="chip" data-inc="0">Equatorial 0°</button>
+                  <button type="button" class="chip" data-inc="51.6">ISS 51.6°</button>
+                  <button type="button" class="chip" data-inc="90">Polar 90°</button>
+                  <button type="button" class="chip" data-inc="sso">Sun-sync (auto)</button>
+                </div>
+              </div>
               <button class="btn" id="opt-btn"><svg class="ic"><use href="#i-rocket"/></svg>Find orbit</button>
             </form>
             <div id="opt-out"><div class="empty"><svg class="ic"><use href="#i-rocket"/></svg><p>Choose a mission and press <b>Find orbit</b>.</p></div></div>
           </div>
           <div class="card"><div class="globe-slot" data-globe></div>
-            <p class="hint"><svg class="ic"><use href="#i-info"/></svg>Your recommended satellite flies in green.</p></div>
+            <p class="hint"><svg class="ic"><use href="#i-info"/></svg>Your recommended (or chosen) satellite flies in green.</p></div>
         </div>
         <div class="card mt" id="opt-chart-card" hidden><div class="card-h"><svg class="ic"><use href="#i-layers"/></svg><h3>How crowded is each altitude?</h3></div>
           <p class="note">Tracked objects per 10⁹ km³ (active satellites + major debris clouds). Green = recommended, amber = runners-up.</p>

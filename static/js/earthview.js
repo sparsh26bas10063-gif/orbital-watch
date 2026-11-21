@@ -166,7 +166,7 @@ const EarthView = (() => {
     }
     info.innerHTML = `${place && !ride ? `<b>${esc(place.short)}</b><br>` : ""}` +
       `${fmt(Math.abs(lat), 4)}°${lat >= 0 ? "N" : "S"} ${fmt(Math.abs(lng), 4)}°${lng >= 0 ? "E" : "W"}` +
-      (elev ? ` · ground ${fmt(elev / 1.5)} m` : "") +
+      (elev > 1 ? ` · ground ${fmt(elev / 1.5)} m` : "") +
       `<br>${G() ? "Camera distance" : "Camera"} ≈ ${camKm < 10 ? fmt(camKm, 2) : fmt(camKm)} km · tilt ${fmt(tilt)}°` +
       `<br><span style="color:var(--accent)">${G() ? "Google Photorealistic 3D" : "Open 3D terrain (Esri + AWS)"}</span>`;
   }
@@ -246,7 +246,18 @@ const EarthView = (() => {
     const h0 = heading(st, nx);
     ride = {s, ready: false, heading: Number.isFinite(h0) ? h0 : 0};
     place = {name: `Below ${s.name}`, short: `Below ${s.name}`, lat: clampLat(st.lat), lon: st.lon};
-    const badge = $("#ride-badge"); badge.hidden = false;
+    // Build the banner ONCE. It used to be re-rendered every 80 ms, which replaced the Stop button
+    // between mousedown and mouseup, so clicks never registered.
+    const badge = $("#ride-badge");
+    badge.innerHTML = `${icon("satellite")}<span class="ride-text"></span><button type="button" class="ride-stop">${icon("x")}Stop</button>`;
+    const badgeText = $(".ride-text", badge);
+    const stopBtn = $(".ride-stop", badge);
+    // react on press (pointerdown), not only on a completed click, so nothing can swallow it
+    stopBtn.addEventListener("pointerdown", e => { e.preventDefault(); e.stopPropagation(); stopRide(true); });
+    stopBtn.addEventListener("click", e => { e.stopPropagation(); stopRide(true); });
+    stopBtn.title = "Stop riding (Esc)";
+    badgeText.textContent = `Flying to ${s.name}…`;
+    badge.hidden = false;
     if (G()) {
       // camera sits at the satellite's real height, looking down and slightly ahead along its track
       Google3D.setPin(null);
@@ -273,9 +284,9 @@ const EarthView = (() => {
       if (Number.isFinite(h)) ride.heading += ((h - ride.heading + 540) % 360 - 180) * .1;
       const lat = clampLat(a.lat), polar = lat !== a.lat;
       place.lat = lat; place.lon = a.lon;
-      badge.innerHTML = `${icon("satellite")}${G() ? "Seeing Earth from" : "Riding under"} ${esc(s.name)} · ${fmt(a.alt)} km up · ${fmt(a.v, 2)} km/s` +
-        `${polar ? " · over the pole (view held at 80°)" : ""} <button type="button">Stop</button>`;
-      $("button", badge).onclick = stopRide;
+      const text = `${G() ? "Seeing Earth from" : "Riding under"} ${s.name} · ${fmt(a.alt)} km up · ${fmt(a.v, 2)} km/s` +
+        (polar ? " · over the pole (view held at 80°)" : "");
+      if (badgeText.textContent !== text) badgeText.textContent = text;
       if (!ride.ready) return;
       if (G()) { Google3D.follow(a.lat, a.lon, ride.heading); return; }
       satMarker.setLngLat([a.lon, lat]);
@@ -285,10 +296,32 @@ const EarthView = (() => {
     };
     requestAnimationFrame(tick);
     refreshOverhead();
+    syncStopPanel();
   }
-  function stopRide() {
+  function syncStopPanel() {
+    let b = $("#ov-stop");
+    if (!b) {
+      $("#ov-note").insertAdjacentHTML("beforebegin", `<button class="btn sm" id="ov-stop" type="button" hidden style="margin-bottom:12px;background:linear-gradient(135deg,#ff5c72,#ff8a5c)">${icon("x")}Stop riding</button>`);
+      b = $("#ov-stop");
+      b.addEventListener("click", () => stopRide(true));
+    }
+    b.hidden = !ride;
+  }
+  addEventListener("keydown", e => { if (e.key === "Escape" && ride && visible) stopRide(true); });
+  function stopRide(byUser = false) {
     if (!ride) return;
-    ride = null; $("#ride-badge").hidden = true; satMarker?.remove();
+    const name = ride.s.name;
+    ride = null;
+    $("#ride-badge").hidden = true;
+    satMarker?.remove();
+    syncStopPanel();
+    if (byUser) {
+      // also halt any camera flight still in progress, and leave the view where it is
+      if (G()) Google3D.stop(); else map?.stop();
+      place = place && {...place, name: `Near ${name}`, short: `Last seen below ${name}`};
+      updateInfo(); refreshOverhead();
+      toast(`Stopped riding ${esc(name)}. Drag to explore, or pick another satellite.`, "good", 3500);
+    }
   }
 
   /* ---------- satellites overhead ---------- */

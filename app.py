@@ -19,6 +19,16 @@ import spaceweather
 
 app = Flask(__name__)
 
+
+@app.url_defaults
+def _static_version(endpoint, values):
+    """Add ?v=<mtime> to static URLs so browsers always load the newest CSS/JS after a change."""
+    if endpoint == "static" and "filename" in values:
+        try:
+            values["v"] = int(os.path.getmtime(os.path.join(app.static_folder, values["filename"])))
+        except OSError:
+            pass
+
 ON_VERCEL = bool(os.getenv("VERCEL"))
 _catalogs = {}   # which -> {"sats": [...], "loaded": t}
 _lock = threading.Lock()
@@ -267,9 +277,19 @@ def api_optimize():
         raise ApiError(f"Unknown launch site '{site}'.", "BAD_INPUT", 400)
     site_lat = arg("lat", float, oo.LAUNCH_SITES[site], -90, 90, "latitude")
     years = arg("years", float, 5, 0.5, 30, "mission life")
-    best, (centers, dens) = oo.optimize(cat, mission=mission, site_lat=site_lat, mission_years=years)
+    # optional: place the satellite in your own orbit
+    alt = arg("alt", float, None, 160, 40000, "altitude (km)")
+    inc = arg("inc", float, None, 0, 180, "inclination (degrees)")
+    details = {}
+    best, (centers, dens) = oo.optimize(cat, mission=mission, site_lat=site_lat, mission_years=years,
+                                        custom_alt=alt, custom_inc=inc, details=details)
     out = {"best": best, "site_lat": site_lat, "mission": mission,
            "density": {"alt": list(centers), "per_1e9_km3": list(dens * 1e9)}}
+    if alt is not None or inc is not None:
+        out["custom"] = {"alt_km": alt, "inc_deg": inc, "rank": details.get("user_rank"),
+                         "of": details.get("candidates"), "overall_best": details.get("overall_best")}
+        if mission == "earth-observation" and alt is not None and oo.sun_sync_inclination(alt) is None:
+            out["custom"]["note"] = "Sun-synchronous orbits are impossible above ~5,970 km, so this can't be a typical imaging orbit."
     if mission == "communications":
         out["geo"] = oo.geo_option(site_lat)
     return out
