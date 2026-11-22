@@ -1,6 +1,1 @@
 # OrbitGuard | ASTRA 2026 | Team AstroNex
-# Keep the demo video and recording scripts out of the website deployment
-demo/
-.demo-lib/
-demo-work/
-pitch/

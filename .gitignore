@@ -6,5 +6,3 @@ data/
 output/
 .vercel/
 .env
-.demo-lib/
-demo-work/
