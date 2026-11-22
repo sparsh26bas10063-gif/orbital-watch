@@ -6,6 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ code }} · {{ title }} · OrbitGuard</title>
 <meta name="theme-color" content="#000000">
+<script>try { if (localStorage.getItem("og-theme") === "light") document.documentElement.dataset.theme = "light"; } catch (e) {}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/orbitguard.css') }}">
@@ -36,6 +37,9 @@
   .btns { justify-content: center; }
   .telemetry { margin: 28px auto 0; display: inline-flex; gap: 18px; flex-wrap: wrap; justify-content: center; font: 500 11px var(--mono); color: var(--dim); }
   .telemetry b { color: var(--bad); font-weight: 500; }
+  [data-theme="light"] .orbit { border-color: rgba(20,16,30,.22); }
+  [data-theme="light"] .drift svg { color: #14101c; }
+  [data-theme="light"] .code { background-image: linear-gradient(90deg, #14101c, #d0070f 40%, #a3245d 70%, #14101c); }
 </style>
 </head>
 <body>

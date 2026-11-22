@@ -1,11 +1,27 @@
 /* OrbitGuard | ASTRA 2026 | Team AstroNex */
 /* OrbitGuard app: routing, dashboard, satellite finder, collisions, space weather, planner, asteroids */
 "use strict";
-if (window.Chart) {
-  Chart.defaults.color = "#b3b3b3"; Chart.defaults.borderColor = "rgba(128,128,128,.18)";
+const charts = {};
+function chartTheme() {
+  if (!window.Chart) return;
+  Chart.defaults.color = cssVar("--muted") || "#b3b3b3";
+  Chart.defaults.borderColor = Theme.get() === "light" ? "rgba(20,16,30,.12)" : "rgba(128,128,128,.18)";
   Chart.defaults.font.family = '"Inter", system-ui, sans-serif';
 }
-const charts = {};
+chartTheme();
+on("theme", () => {
+  chartTheme();
+  for (const c of Object.values(charts)) {
+    if (!c?.options) continue;
+    for (const sc of Object.values(c.options.scales || {})) {
+      if (sc.ticks) sc.ticks.color = Chart.defaults.color;
+      if (sc.title) sc.title.color = Chart.defaults.color;
+      if (sc.grid) sc.grid.color = Chart.defaults.borderColor;
+    }
+    if (c.options.plugins?.legend?.labels) c.options.plugins.legend.labels.color = Chart.defaults.color;
+    c.update("none");
+  }
+});
 const RE_KM = 6378.137;
 
 /* =====================================================================
@@ -270,7 +286,7 @@ function renderTelemetry() {
 }
 function updateHeroLive(st) {
   $("#h-latlon").textContent = `${fmtLat(st.lat)}, ${fmtLon(st.lon)}`;
-  $("#h-sun").innerHTML = st.sunlit ? '<span style="color:var(--warn)">☀ Sunlit</span>' : '<span style="color:#ffb3b8">☾ Eclipse</span>';
+  $("#h-sun").innerHTML = st.sunlit ? '<span style="color:var(--warn)">☀ Sunlit</span>' : '<span style="color:var(--eclipse)">☾ Eclipse</span>';
   $("#h-alt").textContent = fmt(st.alt, 1) + " km";
   $("#h-vel").textContent = fmt(st.v, 2) + " km/s";
   $("#h-per").textContent = fmt(st.period, 1) + " min";
@@ -393,8 +409,8 @@ function gaugeSVG(kp) {
     return `<path d="M${p(a0)} A${r} ${r} 0 0 1 ${p(a1)}" stroke="${kpColor(i + .5)}" stroke-width="10" fill="none" opacity="${i < kp ? 1 : .22}"/>`;
   }).join("");
   return `<svg viewBox="0 0 150 88">${seg}<g class="needle" style="transform:rotate(${Math.min(9, kp) / 9 * 180}deg)">
-    <line x1="75" y1="75" x2="24" y2="75" stroke="#fff" stroke-width="3" stroke-linecap="round"/></g>
-    <circle cx="75" cy="75" r="6" fill="#fff"/><text x="12" y="88" fill="#808080" font-size="9">0</text><text x="133" y="88" fill="#808080" font-size="9">9</text></svg>`;
+    <line x1="75" y1="75" x2="24" y2="75" style="stroke:var(--text)" stroke-width="3" stroke-linecap="round"/></g>
+    <circle cx="75" cy="75" r="6" style="fill:var(--text)"/><text x="12" y="88" fill="#808080" font-size="9">0</text><text x="133" y="88" fill="#808080" font-size="9">9</text></svg>`;
 }
 function renderGauge(d) {
   const g = $("#kp-gauge");

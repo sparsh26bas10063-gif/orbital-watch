@@ -18,6 +18,32 @@ const bus = new EventTarget();
 const emit = (type, detail) => bus.dispatchEvent(new CustomEvent(type, {detail}));
 const on = (type, fn) => bus.addEventListener(type, e => fn(e.detail));
 
+/* ---------------------------------------------------------------- light / dark theme */
+const Theme = (() => {
+  const root = document.documentElement;
+  const get = () => root.dataset.theme === "light" ? "light" : "dark";
+  function sync() {
+    const light = get() === "light", btn = $("#theme-btn");
+    const meta = $('meta[name="theme-color"]'); if (meta) meta.content = light ? "#f4f2f6" : "#000000";
+    if (btn) {
+      const label = light ? "Switch to dark mode" : "Switch to light mode";
+      btn.setAttribute("aria-label", label); btn.title = label;
+      btn.querySelector("use")?.setAttribute("href", light ? "#i-moon" : "#i-sun");
+    }
+  }
+  function set(t) {
+    if (t === "light") root.dataset.theme = "light"; else delete root.dataset.theme;
+    try { localStorage.setItem("og-theme", t); } catch (e) { /* private mode: theme just won't be remembered */ }
+    sync(); emit("theme", t);
+  }
+  document.addEventListener("DOMContentLoaded", () => {
+    sync();
+    $("#theme-btn")?.addEventListener("click", () => set(get() === "light" ? "dark" : "light"));
+  });
+  return {get, set};
+})();
+const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
 /* ---------------------------------------------------------------- errors */
 class AppError extends Error {
   constructor(message, {code = "ERROR", hint = null, status = 0} = {}) { super(message); this.code = code; this.hint = hint; this.status = status; }
